@@ -17,7 +17,9 @@
         'Remove-ProcedureStep',
         'Move-ProcedureStep',
         'Update-ProcedureStepIds',
-        'Get-ProcedureHash'
+        'Get-ProcedureHash',
+        'Show-StepCreaterMainWindow',
+        'Update-StepListUI'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

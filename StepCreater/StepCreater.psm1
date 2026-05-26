@@ -417,3 +417,57 @@ function Get-ProcedureHash {
     $hash = $sha.ComputeHash($bytes)
     return [System.BitConverter]::ToString($hash) -replace '-', ''
 }
+
+function Show-StepCreaterMainWindow {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [WorkSession]$Session,
+        [switch]$NoShow
+    )
+
+    Add-Type -AssemblyName PresentationFramework
+    Add-Type -AssemblyName PresentationCore
+    Add-Type -AssemblyName WindowsBase
+
+    $xamlPath = Join-Path $PSScriptRoot 'ui/MainWindow.xaml'
+    $xml = [xml](Get-Content -LiteralPath $xamlPath -Raw)
+    $reader = [System.Xml.XmlNodeReader]::new($xml)
+    $window = [Windows.Markup.XamlReader]::Load($reader)
+
+    $c = @{}
+    foreach ($name in @(
+        'MenuNew','MenuOpen','MenuSave','MenuExit','MenuTemplates',
+        'StatusText','DirtyText',
+        'TabEdit','TabExecute','TabCapture',
+        'WorkfolderPath','BtnSave',
+        'StepList','BtnAdd','BtnDelete','BtnUp','BtnDown',
+        'TxtTitle','CboStatus','TxtBody','TxtCommand','TxtExpected','TxtNote'
+    )) { $c[$name] = $window.FindName($name) }
+
+    $c.WorkfolderPath.Text = $Session.WorkFolderPath
+    $window.Title          = "StepCreater - $($Session.Procedure.Title)"
+    Update-StepListUI -Session $Session -ListBox $c.StepList
+
+    $window.Tag = [pscustomobject]@{
+        Session  = $Session
+        Controls = $c
+        Baseline = (Get-ProcedureHash -Procedure $Session.Procedure)
+    }
+
+    if ($NoShow) { return $window }
+    [void]$window.ShowDialog()
+    return $window
+}
+
+function Update-StepListUI {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [WorkSession]$Session,
+        [Parameter(Mandatory)] $ListBox
+    )
+    $ListBox.Items.Clear()
+    foreach ($step in $Session.Procedure.Steps) {
+        $item = "[{0}] {1}: {2}" -f $step.Status, $step.Id, $step.Title
+        [void]$ListBox.Items.Add($item)
+    }
+}
