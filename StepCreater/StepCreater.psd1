@@ -12,7 +12,12 @@
         'Open-StepCreaterWorkfolder',
         'Get-StepCreaterConfig',
         'Set-StepCreaterConfig',
-        'Get-StepTemplates'
+        'Get-StepTemplates',
+        'Add-ProcedureStepAt',
+        'Remove-ProcedureStep',
+        'Move-ProcedureStep',
+        'Update-ProcedureStepIds',
+        'Get-ProcedureHash'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

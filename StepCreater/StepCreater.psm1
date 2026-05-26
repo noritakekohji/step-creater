@@ -359,3 +359,61 @@ function Get-StepTemplates {
     }
     return $list
 }
+
+function Add-ProcedureStepAt {
+    [CmdletBinding()]
+    [OutputType([Step])]
+    param(
+        [Parameter(Mandatory)] [ProcedureDoc]$Procedure,
+        [Parameter(Mandatory)] [int]$Index,
+        [Parameter(Mandatory)] [string]$Title
+    )
+    $step = [Step]::new('', $Title)
+    $Procedure.Steps.Insert($Index, $step) | Out-Null
+    Update-ProcedureStepIds -Procedure $Procedure
+    return $step
+}
+
+function Remove-ProcedureStep {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [ProcedureDoc]$Procedure,
+        [Parameter(Mandatory)] [int]$Index
+    )
+    $Procedure.Steps.RemoveAt($Index) | Out-Null
+    Update-ProcedureStepIds -Procedure $Procedure
+}
+
+function Move-ProcedureStep {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [ProcedureDoc]$Procedure,
+        [Parameter(Mandatory)] [int]$Index,
+        [Parameter(Mandatory)] [ValidateSet('Up','Down')] [string]$Direction
+    )
+    $target = if ($Direction -eq 'Up') { $Index - 1 } else { $Index + 1 }
+    if ($target -lt 0 -or $target -ge $Procedure.Steps.Count) { return }
+    $step = $Procedure.Steps[$Index]
+    $Procedure.Steps.RemoveAt($Index) | Out-Null
+    $Procedure.Steps.Insert($target, $step) | Out-Null
+    Update-ProcedureStepIds -Procedure $Procedure
+}
+
+function Update-ProcedureStepIds {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [ProcedureDoc]$Procedure)
+    for ($i = 0; $i -lt $Procedure.Steps.Count; $i++) {
+        $Procedure.Steps[$i].Id = '{0:D2}' -f ($i + 1)
+    }
+}
+
+function Get-ProcedureHash {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)] [ProcedureDoc]$Procedure)
+    $md = Write-Procedure -Procedure $Procedure
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($md)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $hash = $sha.ComputeHash($bytes)
+    return [System.BitConverter]::ToString($hash) -replace '-', ''
+}
