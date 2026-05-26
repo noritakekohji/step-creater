@@ -343,3 +343,19 @@ function Set-StepCreaterConfig {
     $json = $Config | ConvertTo-Json -Depth 8
     Set-Content -LiteralPath $path -Value $json -Encoding UTF8
 }
+
+function Get-StepTemplates {
+    [CmdletBinding()]
+    [OutputType([System.Collections.Generic.List[object]])]
+    param()
+
+    $dir = Join-Path $PSScriptRoot 'ui/templates'
+    $list = [System.Collections.Generic.List[object]]::new()
+    if (-not (Test-Path -LiteralPath $dir)) { return $list }
+
+    Get-ChildItem -LiteralPath $dir -Filter '*.psd1' | ForEach-Object {
+        $data = Import-PowerShellDataFile -LiteralPath $_.FullName
+        $list.Add([pscustomobject]$data) | Out-Null
+    }
+    return $list
+}

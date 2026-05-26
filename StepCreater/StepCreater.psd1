@@ -11,7 +11,8 @@
         'New-StepCreaterWorkfolder',
         'Open-StepCreaterWorkfolder',
         'Get-StepCreaterConfig',
-        'Set-StepCreaterConfig'
+        'Set-StepCreaterConfig',
+        'Get-StepTemplates'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
