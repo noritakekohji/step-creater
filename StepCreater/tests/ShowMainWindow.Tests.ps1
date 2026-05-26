@@ -26,3 +26,28 @@ Describe 'Show-StepCreaterMainWindow -NoShow' {
         $listBox.Items[1] | Should -Match '02.*Step Two'
     }
 }
+
+Describe 'Detail editor wiring' {
+    BeforeAll {
+        $script:tmp2 = Join-Path $TestDrive 'wf-detail'
+        New-StepCreaterWorkfolder -Path $script:tmp2 -Title 'Detail Test' | Out-Null
+        $script:session2 = Open-StepCreaterWorkfolder -Path $script:tmp2
+        $s = $script:session2.Procedure.AddStep('Some Title')
+        $s.BodyMarkdown = 'Body text'
+        $s.Command = 'Get-Process'
+        $s.ExpectedResult = 'List of processes'
+        $s.Status = 'done'
+        $s.Note = 'A note'
+    }
+
+    It 'populates editor controls when a step is selected' {
+        $win = Show-StepCreaterMainWindow -Session $script:session2 -NoShow
+        $win.FindName('StepList').SelectedIndex = 0
+        $win.FindName('TxtTitle').Text    | Should -Be 'Some Title'
+        $win.FindName('TxtBody').Text     | Should -Be 'Body text'
+        $win.FindName('TxtCommand').Text  | Should -Be 'Get-Process'
+        $win.FindName('TxtExpected').Text | Should -Be 'List of processes'
+        $win.FindName('TxtNote').Text     | Should -Be 'A note'
+        ($win.FindName('CboStatus').SelectedItem.Content) | Should -Be 'done'
+    }
+}

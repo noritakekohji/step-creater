@@ -448,6 +448,66 @@ function Show-StepCreaterMainWindow {
     $window.Title          = "StepCreater - $($Session.Procedure.Title)"
     Update-StepListUI -Session $Session -ListBox $c.StepList
 
+    # Editor sync state
+    $editorState = [pscustomobject]@{
+        CurrentStepIndex = -1
+        SuppressEdit     = $false
+    }
+
+    $loadStep = {
+        param($idx)
+        if ($idx -lt 0 -or $idx -ge $Session.Procedure.Steps.Count) {
+            $editorState.SuppressEdit = $true
+            $c.TxtTitle.Text    = ''
+            $c.TxtBody.Text     = ''
+            $c.TxtCommand.Text  = ''
+            $c.TxtExpected.Text = ''
+            $c.TxtNote.Text     = ''
+            $c.CboStatus.SelectedIndex = -1
+            $editorState.SuppressEdit = $false
+            $editorState.CurrentStepIndex = -1
+            return
+        }
+        $step = $Session.Procedure.Steps[$idx]
+        $editorState.SuppressEdit = $true
+        $c.TxtTitle.Text    = $step.Title
+        $c.TxtBody.Text     = $step.BodyMarkdown
+        $c.TxtCommand.Text  = $step.Command
+        $c.TxtExpected.Text = $step.ExpectedResult
+        $c.TxtNote.Text     = $step.Note
+        $c.CboStatus.SelectedIndex = @('pending','done','ng','skipped').IndexOf($step.Status)
+        $editorState.SuppressEdit = $false
+        $editorState.CurrentStepIndex = $idx
+    }.GetNewClosure()
+
+    $saveEdits = {
+        if ($editorState.SuppressEdit) { return }
+        if ($editorState.CurrentStepIndex -lt 0) { return }
+        $step = $Session.Procedure.Steps[$editorState.CurrentStepIndex]
+        $step.Title          = $c.TxtTitle.Text
+        $step.BodyMarkdown   = $c.TxtBody.Text
+        $step.Command        = $c.TxtCommand.Text
+        $step.ExpectedResult = $c.TxtExpected.Text
+        $step.Note           = $c.TxtNote.Text
+        if ($c.CboStatus.SelectedIndex -ge 0) {
+            $step.Status = @('pending','done','ng','skipped')[$c.CboStatus.SelectedIndex]
+        }
+        $savedIdx = $editorState.CurrentStepIndex
+        Update-StepListUI -Session $Session -ListBox $c.StepList
+        $editorState.SuppressEdit = $true
+        $c.StepList.SelectedIndex = $savedIdx
+        $editorState.SuppressEdit = $false
+        $editorState.CurrentStepIndex = $savedIdx
+        Update-DirtyIndicator -Window $window
+    }.GetNewClosure()
+
+    $c.StepList.Add_SelectionChanged({ & $loadStep $c.StepList.SelectedIndex }.GetNewClosure())
+
+    foreach ($tb in @($c.TxtTitle, $c.TxtBody, $c.TxtCommand, $c.TxtExpected, $c.TxtNote)) {
+        $tb.Add_LostFocus($saveEdits)
+    }
+    $c.CboStatus.Add_SelectionChanged($saveEdits)
+
     $window.Tag = [pscustomobject]@{
         Session  = $Session
         Controls = $c
@@ -470,4 +530,14 @@ function Update-StepListUI {
         $item = "[{0}] {1}: {2}" -f $step.Status, $step.Id, $step.Title
         [void]$ListBox.Items.Add($item)
     }
+}
+
+function Update-DirtyIndicator {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Window)
+    $tag = $Window.Tag
+    if (-not $tag) { return }
+    $current = Get-ProcedureHash -Procedure $tag.Session.Procedure
+    $isDirty = ($current -ne $tag.Baseline)
+    $tag.Controls.DirtyText.Text = if ($isDirty) { '● 未保存' } else { '' }
 }
