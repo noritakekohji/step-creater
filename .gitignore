@@ -1,0 +1,23 @@
+# PowerShell
+*.ps1xml.cache
+*.psf
+
+# Test artifacts
+TestResults.xml
+coverage.xml
+.pester/
+
+# Build artifacts
+build/
+out/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
+
+# Local config & secrets
+*.local.json
+*.local.psd1
