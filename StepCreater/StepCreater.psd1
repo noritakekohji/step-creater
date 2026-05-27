@@ -34,7 +34,8 @@
         'Save-StepCreaterCapture',
         'Update-UnassignedTrayUI',
         'Get-ProgressLabel',
-        'Update-ExecChecklistUI'
+        'Update-ExecChecklistUI',
+        'Set-StepStatus'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

@@ -1234,6 +1234,24 @@ function Get-ProgressLabel {
     return ('進捗: {0} / {1} (完了 {2} / NG {3} / スキップ {4})' -f $touched, $total, $done, $ng, $skipped)
 }
 
+function Set-StepStatus {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [Step]$Step,
+        [Parameter(Mandatory)] [ValidateSet('pending','done','ng','skipped')] [string]$Status
+    )
+    $now = Get-Date
+    if ($Status -eq 'pending') {
+        $Step.Status   = 'pending'
+        $Step.Started  = $null
+        $Step.Finished = $null
+        return
+    }
+    if (-not $Step.Started) { $Step.Started = $now }
+    $Step.Finished = $now
+    $Step.Status   = $Status
+}
+
 function Update-ExecChecklistUI {
     [CmdletBinding()]
     param(
