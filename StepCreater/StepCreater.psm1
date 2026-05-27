@@ -779,8 +779,17 @@ function Show-StepCreaterMainWindow {
         $captureHandler = {
             param($kind)
             try {
-                Save-StepCreaterCapture -Session $Session -Kind $kind -StepId '' | Out-Null
-                Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
+                $stepId = ''
+                if ($Session.Mode -eq 'Execute' -and $c.ExecChecklist.SelectedIndex -ge 0) {
+                    $stepId = $Session.Procedure.Steps[$c.ExecChecklist.SelectedIndex].Id
+                }
+                Save-StepCreaterCapture -Session $Session -Kind $kind -StepId $stepId | Out-Null
+                if ($Session.Mode -eq 'Execute') {
+                    Update-ExecChecklistUI -Session $Session -ListBox $c.ExecChecklist -ProgressLabel $c.ProgressLabel
+                    & $loadExecStep $c.ExecChecklist.SelectedIndex
+                } else {
+                    Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
+                }
                 Save-WorkSession -Session $Session
                 $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
                 Update-DirtyIndicator -Window $window
