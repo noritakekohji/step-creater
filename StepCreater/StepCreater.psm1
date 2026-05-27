@@ -632,6 +632,26 @@ function Show-StepCreaterMainWindow {
         Show-StepCreaterMainWindow -Session $newSession
     }.GetNewClosure())
 
+    foreach ($tpl in (Get-StepTemplates)) {
+        $mi = [System.Windows.Controls.MenuItem]::new()
+        $mi.Header = $tpl.Name
+        $tplLocal = $tpl
+        $mi.Add_Click({
+            $idx = if ($c.StepList.SelectedIndex -ge 0) { $c.StepList.SelectedIndex + 1 } else { $Session.Procedure.Steps.Count }
+            $newStep = Add-ProcedureStepAt -Procedure $Session.Procedure -Index $idx -Title $tplLocal.Title
+            $newStep.BodyMarkdown   = [string]$tplLocal.BodyMarkdown
+            $newStep.Command        = [string]$tplLocal.Command
+            $newStep.ExpectedResult = [string]$tplLocal.ExpectedResult
+            $newStep.Note           = [string]$tplLocal.Note
+            Update-StepListUI -Session $Session -ListBox $c.StepList
+            $c.StepList.SelectedIndex = $idx
+            Save-WorkSession -Session $Session
+            $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+            Update-DirtyIndicator -Window $window
+        }.GetNewClosure())
+        $c.MenuTemplates.Items.Add($mi) | Out-Null
+    }
+
     $window.Add_Closing({
         $e = $args[1]
         if (-not (& $confirmDiscard)) { $e.Cancel = $true }

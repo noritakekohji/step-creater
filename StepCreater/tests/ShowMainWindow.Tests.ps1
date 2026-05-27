@@ -178,3 +178,40 @@ Describe 'File menu wiring' {
         $mi | Should -Not -BeNullOrEmpty
     }
 }
+
+Describe 'Template insertion menu' {
+    BeforeEach {
+        $script:tmp7 = Join-Path $TestDrive ("wf-tpl-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-StepCreaterWorkfolder -Path $script:tmp7 -Title 'Tpl Test' | Out-Null
+        $script:session7 = Open-StepCreaterWorkfolder -Path $script:tmp7
+        $script:session7.Procedure.AddStep('Existing') | Out-Null
+        $script:win7 = Show-StepCreaterMainWindow -Session $script:session7 -NoShow
+    }
+
+    It 'populates MenuTemplates with one item per template' {
+        $menu = $script:win7.FindName('MenuTemplates')
+        $expected = (Get-StepTemplates).Count
+        $menu.Items.Count | Should -Be $expected
+    }
+
+    It 'clicking a template inserts a new step with template content and auto-saves' {
+        $menu = $script:win7.FindName('MenuTemplates')
+        $iisItem = $menu.Items | Where-Object { $_.Header -eq 'IIS Install' } | Select-Object -First 1
+        $iisItem | Should -Not -BeNullOrEmpty
+
+        # Simulate click
+        $iisItem.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.MenuItem]::ClickEvent))
+
+        $script:session7.Procedure.Steps.Count | Should -Be 2
+        $newStep = $script:session7.Procedure.Steps[1]
+        $newStep.Title   | Should -Match 'IIS'
+        $newStep.Command | Should -Match 'Install-WindowsFeature'
+
+        # Verify auto-save happened
+        $md = Get-Content (Join-Path $script:tmp7 'procedure.md') -Raw
+        $md | Should -Match 'Install-WindowsFeature'
+
+        # Dirty indicator cleared after auto-save
+        $script:win7.FindName('DirtyText').Text | Should -Be ''
+    }
+}
