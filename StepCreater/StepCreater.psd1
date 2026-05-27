@@ -26,7 +26,9 @@
         'Get-CaptureFileName',
         'Invoke-FullScreenCapture',
         'Invoke-ActiveWindowCapture',
-        'ConvertTo-HotkeySpec'
+        'ConvertTo-HotkeySpec',
+        'Register-StepCreaterHotkeys',
+        'Unregister-StepCreaterHotkeys'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

@@ -862,3 +862,78 @@ function ConvertTo-HotkeySpec {
     }
     return [pscustomobject]@{ Modifiers = $mods; VKey = $vk }
 }
+
+function Register-StepCreaterHotkeys {
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
+    param(
+        [Parameter(Mandatory)] $Window,
+        [Parameter(Mandatory)] [hashtable]$Combos,
+        [Parameter(Mandatory)] [scriptblock]$OnFull,
+        [Parameter(Mandatory)] [scriptblock]$OnWindow,
+        [Parameter(Mandatory)] [scriptblock]$OnRect
+    )
+    Initialize-StepCreaterWin32
+
+    $helper = [System.Windows.Interop.WindowInteropHelper]::new($Window)
+    $hwnd = $helper.Handle
+    if ($hwnd -eq [IntPtr]::Zero) {
+        throw 'Window has no HWND yet. Call after Window is loaded (e.g. inside Window.Loaded handler).'
+    }
+    $src = [System.Windows.Interop.HwndSource]::FromHwnd($hwnd)
+
+    # Referenced inside $hook closure; touch here to satisfy PSReviewUnusedParameter
+    $null = $OnFull, $OnWindow, $OnRect
+
+    $registrations = @{}
+    $idCounter = 1000
+    foreach ($kind in 'full','window','rect') {
+        $combo = $Combos[$kind]
+        if (-not $combo) { continue }
+        $spec = ConvertTo-HotkeySpec -Combo $combo
+        $id = $idCounter++
+        $ok = [StepCreater.Win32]::RegisterHotKey($hwnd, $id, [uint32]$spec.Modifiers, [uint32]$spec.VKey)
+        if (-not $ok) {
+            Write-Warning "Hotkey '$combo' could not be registered (already in use?)."
+            continue
+        }
+        $registrations[$id] = @{ Kind = $kind; Combo = $combo }
+    }
+
+    $hook = {
+        param($hwndArg, $msg, $wparam, $lparam, $handled)
+        $null = $hwndArg, $lparam  # required by HwndSourceHook signature; not used
+        if ($msg -ne [StepCreater.Win32]::WM_HOTKEY) { return [IntPtr]::Zero }
+        $id = [int]$wparam
+        $reg = $registrations[$id]
+        if (-not $reg) { return [IntPtr]::Zero }
+        switch ($reg.Kind) {
+            'full'   { & $OnFull   }
+            'window' { & $OnWindow }
+            'rect'   { & $OnRect   }
+        }
+        $handled.Value = $true
+        return [IntPtr]::Zero
+    }.GetNewClosure()
+
+    $src.AddHook($hook)
+
+    return [pscustomobject]@{
+        Hwnd          = $hwnd
+        Registrations = $registrations
+        Source        = $src
+        Hook          = $hook
+    }
+}
+
+function Unregister-StepCreaterHotkeys {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Handle)
+    Initialize-StepCreaterWin32
+    foreach ($id in $Handle.Registrations.Keys) {
+        [StepCreater.Win32]::UnregisterHotKey($Handle.Hwnd, [int]$id) | Out-Null
+    }
+    if ($Handle.Source -and $Handle.Hook) {
+        $Handle.Source.RemoveHook($Handle.Hook)
+    }
+}
