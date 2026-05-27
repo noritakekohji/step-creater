@@ -10,7 +10,7 @@ rem  - Optionally removes user config at %APPDATA%\StepCreater
 rem ============================================================
 
 set "INSTALL_DIR=%LOCALAPPDATA%\Programs\StepCreater"
-set "SHORTCUT=%APPDATA%\Microsoft\Windows\Start Menu\Programs\StepCreater.lnk"
+set "SHORTCUT=%USERPROFILE%\Desktop\StepCreater.lnk"
 set "CONFIG_DIR=%APPDATA%\StepCreater"
 
 echo.
@@ -19,7 +19,7 @@ echo  StepCreater Uninstaller
 echo ============================================================
 echo.
 echo  Install location : %INSTALL_DIR%
-echo  Start Menu       : %SHORTCUT%
+echo  Desktop shortcut : %SHORTCUT%
 echo  Config (optional): %CONFIG_DIR%
 echo.
 
@@ -44,9 +44,9 @@ if exist "%INSTALL_DIR%" (
     echo  - Install directory not found, skipping.
 )
 
-rem --- Remove Start Menu shortcut ------------------------------
+rem --- Remove Desktop shortcut ---------------------------------
 if exist "%SHORTCUT%" (
-    echo Removing Start Menu shortcut...
+    echo Removing Desktop shortcut...
     del /f /q "%SHORTCUT%" >nul 2>&1
     if errorlevel 1 (
         echo [WARN] Could not remove shortcut.

@@ -61,7 +61,7 @@ Invoke-Build -File StepCreater/StepCreater.build.ps1 All
 エンドユーザー向けの per-user インストーラ（管理者権限不要）：
 
 ```
-install.bat       -- %LOCALAPPDATA%\Programs\StepCreater にコピー＋スタートメニュー登録
+install.bat       -- %LOCALAPPDATA%\Programs\StepCreater にコピー＋デスクトップショートカット作成
 uninstall.bat     -- 上記をアンインストール（config は任意削除）
 ```
 

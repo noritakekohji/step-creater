@@ -10,8 +10,8 @@ rem  - No admin rights required (per-user install)
 rem ============================================================
 
 set "INSTALL_DIR=%LOCALAPPDATA%\Programs\StepCreater"
-set "START_MENU=%APPDATA%\Microsoft\Windows\Start Menu\Programs"
-set "SHORTCUT=%START_MENU%\StepCreater.lnk"
+set "DESKTOP=%USERPROFILE%\Desktop"
+set "SHORTCUT=%DESKTOP%\StepCreater.lnk"
 set "SCRIPT_DIR=%~dp0"
 
 echo.
@@ -20,7 +20,7 @@ echo  StepCreater Installer
 echo ============================================================
 echo.
 echo  Install location : %INSTALL_DIR%
-echo  Start Menu       : %SHORTCUT%
+echo  Desktop shortcut : %SHORTCUT%
 echo.
 
 rem --- Check PowerShell availability ---------------------------
@@ -75,8 +75,8 @@ rem --- Write launcher cmd --------------------------------------
 >>"%INSTALL_DIR%\StepCreater.cmd" echo powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%%~dp0StepCreater\StepCreater.ps1" %%*
 echo  - StepCreater.cmd launcher created.
 
-rem --- Create Start Menu shortcut via PowerShell ---------------
-echo  - Creating Start Menu shortcut...
+rem --- Create Desktop shortcut via PowerShell ------------------
+echo  - Creating Desktop shortcut...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ws = New-Object -ComObject WScript.Shell;" ^
   "$s = $ws.CreateShortcut('%SHORTCUT%');" ^
@@ -86,7 +86,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
   "$s.IconLocation = 'powershell.exe,0';" ^
   "$s.Save()" >nul 2>&1
 if errorlevel 1 (
-    echo [WARN] Could not create Start Menu shortcut, continuing anyway.
+    echo [WARN] Could not create Desktop shortcut, continuing anyway.
 ) else (
     echo  - Shortcut created.
 )
@@ -95,7 +95,7 @@ echo.
 echo ============================================================
 echo  Install complete.
 echo.
-echo  Launch:  Start Menu -^> StepCreater
+echo  Launch:  Desktop -^> StepCreater
 echo  Or run:  "%INSTALL_DIR%\StepCreater.cmd"
 echo.
 echo  To remove: run uninstall.bat from this repo.
