@@ -40,7 +40,7 @@
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Orientation="Horizontal">
                 <RadioButton x:Name="TabEdit"    GroupName="Mode" Content="作成"       IsChecked="True" Margin="2"/>
-                <RadioButton x:Name="TabExecute" GroupName="Mode" Content="実施"       IsEnabled="False" Margin="2"/>
+                <RadioButton x:Name="TabExecute" GroupName="Mode" Content="実施"       IsEnabled="True" Margin="2"/>
                 <RadioButton x:Name="TabCapture" GroupName="Mode" Content="画像取得"   IsEnabled="False" Margin="2"/>
             </StackPanel>
             <TextBlock Grid.Column="1" x:Name="WorkfolderPath" VerticalAlignment="Center"
@@ -49,71 +49,136 @@
         </Grid>
 
         <Grid Margin="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="240"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+            <Grid x:Name="EditPanel" Visibility="Visible">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="240"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-            <DockPanel Grid.Column="0" Margin="0,0,8,0">
-                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
-                    <Button x:Name="BtnAdd"    Content="+"  Width="28" Margin="0,0,2,0"/>
-                    <Button x:Name="BtnDelete" Content="×"  Width="28" Margin="2,0,2,0"/>
-                    <Button x:Name="BtnUp"     Content="↑"  Width="28" Margin="2,0,2,0"/>
-                    <Button x:Name="BtnDown"   Content="↓"  Width="28" Margin="2,0,0,0"/>
-                </StackPanel>
-                <ListBox x:Name="StepList"/>
-            </DockPanel>
+                <DockPanel Grid.Column="0" Margin="0,0,8,0">
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+                        <Button x:Name="BtnAdd"    Content="+"  Width="28" Margin="0,0,2,0"/>
+                        <Button x:Name="BtnDelete" Content="×"  Width="28" Margin="2,0,2,0"/>
+                        <Button x:Name="BtnUp"     Content="↑"  Width="28" Margin="2,0,2,0"/>
+                        <Button x:Name="BtnDown"   Content="↓"  Width="28" Margin="2,0,0,0"/>
+                    </StackPanel>
+                    <ListBox x:Name="StepList"/>
+                </DockPanel>
 
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0" Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="120"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="タイトル:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox  Grid.Column="1" x:Name="TxtTitle"/>
-                    <TextBlock Grid.Column="2" Text="ステータス:" VerticalAlignment="Center" Margin="16,0,8,0"/>
-                    <ComboBox Grid.Column="3" x:Name="CboStatus">
-                        <ComboBoxItem Content="pending"/>
-                        <ComboBoxItem Content="done"/>
-                        <ComboBoxItem Content="ng"/>
-                        <ComboBoxItem Content="skipped"/>
-                    </ComboBox>
-                </Grid>
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="タイトル:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox  Grid.Column="1" x:Name="TxtTitle"/>
+                        <TextBlock Grid.Column="2" Text="ステータス:" VerticalAlignment="Center" Margin="16,0,8,0"/>
+                        <ComboBox Grid.Column="3" x:Name="CboStatus">
+                            <ComboBoxItem Content="pending"/>
+                            <ComboBoxItem Content="done"/>
+                            <ComboBoxItem Content="ng"/>
+                            <ComboBoxItem Content="skipped"/>
+                        </ComboBox>
+                    </Grid>
 
-                <GroupBox Grid.Row="1" Header="手順" Margin="0,0,0,4">
-                    <TextBox x:Name="TxtBody" AcceptsReturn="True" TextWrapping="Wrap"
-                             VerticalScrollBarVisibility="Auto"/>
-                </GroupBox>
-
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <GroupBox Grid.Column="0" Header="実行コマンド" Margin="0,4,4,0">
-                        <TextBox x:Name="TxtCommand" AcceptsReturn="True" FontFamily="Consolas"
+                    <GroupBox Grid.Row="1" Header="手順" Margin="0,0,0,4">
+                        <TextBox x:Name="TxtBody" AcceptsReturn="True" TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto"/>
                     </GroupBox>
-                    <GroupBox Grid.Column="1" Header="想定結果" Margin="4,4,0,0">
-                        <TextBox x:Name="TxtExpected" AcceptsReturn="True" TextWrapping="Wrap"
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <GroupBox Grid.Column="0" Header="実行コマンド" Margin="0,4,4,0">
+                            <TextBox x:Name="TxtCommand" AcceptsReturn="True" FontFamily="Consolas"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </GroupBox>
+                        <GroupBox Grid.Column="1" Header="想定結果" Margin="4,4,0,0">
+                            <TextBox x:Name="TxtExpected" AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"/>
+                        </GroupBox>
+                    </Grid>
+
+                    <GroupBox Grid.Row="3" Header="備考" Margin="0,4,0,0" Height="80">
+                        <TextBox x:Name="TxtNote" AcceptsReturn="True" TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto"/>
                     </GroupBox>
                 </Grid>
+            </Grid>
 
-                <GroupBox Grid.Row="3" Header="備考" Margin="0,4,0,0" Height="80">
-                    <TextBox x:Name="TxtNote" AcceptsReturn="True" TextWrapping="Wrap"
-                             VerticalScrollBarVisibility="Auto"/>
-                </GroupBox>
+            <Grid x:Name="ExecutePanel" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="280"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Grid.Column="0" Margin="0,0,8,0">
+                    <TextBlock DockPanel.Dock="Top" x:Name="ProgressLabel"
+                               FontWeight="Bold" Margin="0,0,0,4"/>
+                    <ListBox x:Name="ExecChecklist"/>
+                </DockPanel>
+
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" x:Name="ExecStepTitle" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                    <GroupBox Grid.Row="1" Header="手順">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <TextBox x:Name="ExecBody" IsReadOnly="True" TextWrapping="Wrap"
+                                     BorderThickness="0" Background="White"/>
+                        </ScrollViewer>
+                    </GroupBox>
+
+                    <Grid Grid.Row="2" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <GroupBox Grid.Column="0" Header="実行コマンド">
+                            <TextBox x:Name="ExecCommand" IsReadOnly="True" FontFamily="Consolas"
+                                     BorderThickness="0" Background="WhiteSmoke" Padding="4"/>
+                        </GroupBox>
+                        <Button Grid.Column="1" x:Name="BtnCopyCommand" Content="コピー"
+                                Margin="8,0,0,0" Padding="12,4" VerticalAlignment="Bottom"/>
+                    </Grid>
+
+                    <GroupBox Grid.Row="3" Header="想定結果" Margin="0,8,0,0">
+                        <TextBox x:Name="ExecExpected" IsReadOnly="True" TextWrapping="Wrap"
+                                 BorderThickness="0" Background="White"/>
+                    </GroupBox>
+
+                    <Grid Grid.Row="4" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <WrapPanel Grid.Column="0" x:Name="ExecEvidenceTray" Orientation="Horizontal"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="BtnComplete" Content="✓ 完了して次へ" Padding="14,6" Margin="0,0,4,0"/>
+                            <Button x:Name="BtnNg"       Content="⚠ NG"             Padding="14,6" Margin="0,0,4,0"/>
+                            <Button x:Name="BtnSkip"     Content="スキップ"         Padding="14,6"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
             </Grid>
         </Grid>
     </DockPanel>

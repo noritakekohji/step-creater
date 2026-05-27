@@ -30,7 +30,11 @@
             'WorkfolderPath','BtnSave',
             'StepList','BtnAdd','BtnDelete','BtnUp','BtnDown',
             'TxtTitle','CboStatus','TxtBody','TxtCommand','TxtExpected','TxtNote',
-            'UnassignedTray'
+            'UnassignedTray',
+            'EditPanel','ExecutePanel',
+            'ProgressLabel','ExecChecklist',
+            'ExecStepTitle','ExecBody','ExecCommand','BtnCopyCommand','ExecExpected',
+            'ExecEvidenceTray','BtnComplete','BtnNg','BtnSkip'
         )) {
             $window.FindName($name) | Should -Not -BeNullOrEmpty -Because "$name should exist in XAML"
         }
