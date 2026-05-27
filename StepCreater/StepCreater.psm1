@@ -681,6 +681,38 @@ function Show-StepCreaterMainWindow {
         }
     }.GetNewClosure())
 
+    $window.Add_Loaded({
+        $cfg = Get-StepCreaterConfig
+        $captureHandler = {
+            param($kind)
+            try {
+                Save-StepCreaterCapture -Session $Session -Kind $kind -StepId '' | Out-Null
+                Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
+                Save-WorkSession -Session $Session
+                $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+                Update-DirtyIndicator -Window $window
+                $c.StatusText.Text = "キャプチャ保存 ($(Get-Date -Format HH:mm:ss))"
+            } catch {
+                $c.StatusText.Text = "キャプチャ失敗: $($_.Exception.Message)"
+            }
+        }.GetNewClosure()
+
+        $hk = Register-StepCreaterHotkeys -Window $window -Combos @{
+            full   = $cfg.hotkeys.fullScreen
+            window = $cfg.hotkeys.window
+            rect   = $cfg.hotkeys.rect
+        } -OnFull   { & $captureHandler 'full'   } `
+           -OnWindow { & $captureHandler 'window' } `
+           -OnRect   { & $captureHandler 'rect'   }
+        $window.Tag | Add-Member -NotePropertyName HotkeyHandle -NotePropertyValue $hk -Force
+    }.GetNewClosure())
+
+    $window.Add_Closed({
+        if ($window.Tag.PSObject.Properties['HotkeyHandle'] -and $window.Tag.HotkeyHandle) {
+            Unregister-StepCreaterHotkeys -Handle $window.Tag.HotkeyHandle
+        }
+    }.GetNewClosure())
+
     if ($NoShow) { return $window }
     [void]$window.ShowDialog()
     return $window
