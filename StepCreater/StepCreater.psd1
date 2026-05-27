@@ -21,7 +21,8 @@
         'Show-StepCreaterMainWindow',
         'Update-StepListUI',
         'Update-DirtyIndicator',
-        'Save-WorkSession'
+        'Save-WorkSession',
+        'Initialize-StepCreaterWin32'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

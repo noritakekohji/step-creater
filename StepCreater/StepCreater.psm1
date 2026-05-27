@@ -700,3 +700,56 @@ function Save-WorkSession {
     $mdPath = Join-Path $Session.WorkFolderPath 'procedure.md'
     Set-Content -LiteralPath $mdPath -Value $md -Encoding UTF8
 }
+
+function Initialize-StepCreaterWin32 {
+    [CmdletBinding()]
+    param()
+
+    if ('StepCreater.Win32' -as [type]) { return }
+
+    $signature = @'
+using System;
+using System.Runtime.InteropServices;
+
+namespace StepCreater {
+    public static class Win32 {
+        [DllImport("user32.dll")]
+        public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll")]
+        public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetDesktopWindow();
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute(IntPtr hWnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
+
+        [DllImport("user32.dll")]
+        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT {
+            public int Left; public int Top; public int Right; public int Bottom;
+            public int Width  { get { return Right - Left; } }
+            public int Height { get { return Bottom - Top; } }
+        }
+
+        public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+        public const uint MOD_ALT     = 0x1;
+        public const uint MOD_CONTROL = 0x2;
+        public const uint MOD_SHIFT   = 0x4;
+        public const uint MOD_WIN     = 0x8;
+        public const int  WM_HOTKEY   = 0x0312;
+    }
+}
+'@
+
+    Add-Type -TypeDefinition $signature -ReferencedAssemblies System.Windows.Forms
+}
