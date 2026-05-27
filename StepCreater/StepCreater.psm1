@@ -1532,3 +1532,111 @@ function Get-StepDuration {
     $hours = [int][math]::Floor($span.TotalHours)
     return ('{0:D2}:{1:D2}:{2:D2}' -f $hours, $span.Minutes, $span.Seconds)
 }
+
+function ConvertTo-ProcedureHtml {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)] [ProcedureDoc]$Procedure)
+
+    $esc = {
+        param($s)
+        if ($null -eq $s) { return '' }
+        $s = [string]$s
+        $s = $s -replace '&', '&amp;'
+        $s = $s -replace '<', '&lt;'
+        $s = $s -replace '>', '&gt;'
+        $s = $s -replace '"', '&quot;'
+        return $s
+    }
+
+    $title = & $esc $Procedure.Title
+    $sb = [System.Text.StringBuilder]::new()
+    [void]$sb.AppendLine('<!DOCTYPE html>')
+    [void]$sb.AppendLine('<html lang="ja"><head><meta charset="UTF-8">')
+    [void]$sb.AppendLine("<title>$title</title>")
+    [void]$sb.AppendLine('<style>')
+    [void]$sb.AppendLine(@'
+body { font-family: "Segoe UI", "Yu Gothic UI", sans-serif; max-width: 1000px; margin: 24px auto; padding: 0 16px; color: #222; }
+h1 { border-bottom: 2px solid #444; padding-bottom: 8px; }
+h2 { margin-top: 32px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+.meta { color: #666; font-size: 0.9em; }
+.toc { background: #f7f7f7; padding: 12px 16px; border-radius: 4px; }
+.toc ol { margin: 4px 0; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.85em; margin-right: 8px; color: white; }
+.badge-pending { background: #888; }
+.badge-done    { background: #28a745; }
+.badge-ng      { background: #dc3545; }
+.badge-skipped { background: #ffc107; color: #222; }
+.duration { color: #555; font-size: 0.9em; margin-left: 8px; }
+.section { margin-top: 12px; }
+.section h3 { margin: 8px 0 4px; font-size: 1em; color: #555; }
+pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Consolas, monospace; overflow-x: auto; }
+.evidence img { max-width: 320px; max-height: 240px; margin: 6px; cursor: zoom-in; border: 1px solid #ddd; }
+.lightbox { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; cursor: zoom-out; }
+.lightbox.visible { display: flex; }
+.lightbox img { max-width: 95%; max-height: 95%; }
+@media print {
+    .toc { page-break-after: always; }
+    h2 { page-break-before: always; }
+    .evidence img { max-width: 100%; max-height: none; page-break-inside: avoid; }
+    .lightbox { display: none !important; }
+}
+'@)
+    [void]$sb.AppendLine('</style></head><body>')
+
+    [void]$sb.AppendLine("<h1>$title</h1>")
+    $meta = @()
+    if ($Procedure.Author)  { $meta += "Author: " + (& $esc $Procedure.Author) }
+    if ($Procedure.Created) { $meta += "Created: " + $Procedure.Created.ToString('yyyy-MM-dd') }
+    if ($Procedure.Updated) { $meta += "Updated: " + $Procedure.Updated.ToString('yyyy-MM-dd HH:mm') }
+    if ($meta.Count -gt 0)  { [void]$sb.AppendLine('<div class="meta">' + ($meta -join ' | ') + '</div>') }
+
+    [void]$sb.AppendLine('<div class="toc"><strong>目次</strong><ol>')
+    foreach ($step in $Procedure.Steps) {
+        $stTitle = & $esc $step.Title
+        [void]$sb.AppendLine("<li><a href=`"#step-$($step.Id)`">Step $($step.Id): $stTitle</a></li>")
+    }
+    [void]$sb.AppendLine('</ol></div>')
+
+    foreach ($step in $Procedure.Steps) {
+        $stTitle = & $esc $step.Title
+        $statusClass = "badge badge-" + $step.Status
+        $statusLabel = switch ($step.Status) {
+            'done'    { '完了' }
+            'ng'      { 'NG' }
+            'skipped' { 'スキップ' }
+            default   { '未実施' }
+        }
+        $dur = Get-StepDuration -Step $step
+
+        [void]$sb.AppendLine("<h2 id=`"step-$($step.Id)`">Step $($step.Id): $stTitle</h2>")
+        [void]$sb.AppendLine("<span class=`"$statusClass`">$statusLabel</span><span class=`"duration`">作業時間: $dur</span>")
+
+        if ($step.BodyMarkdown) {
+            [void]$sb.AppendLine('<div class="section"><h3>手順</h3><div>' + (& $esc $step.BodyMarkdown) + '</div></div>')
+        }
+        if ($step.Command) {
+            [void]$sb.AppendLine('<div class="section"><h3>実行コマンド</h3><pre>' + (& $esc $step.Command) + '</pre></div>')
+        }
+        if ($step.ExpectedResult) {
+            [void]$sb.AppendLine('<div class="section"><h3>想定結果</h3><div>' + (& $esc $step.ExpectedResult) + '</div></div>')
+        }
+        if ($step.Evidence.Count -gt 0) {
+            [void]$sb.AppendLine('<div class="section evidence"><h3>エビデンス</h3><div>')
+            foreach ($ev in $step.Evidence) {
+                $src = & $esc $ev.FileName
+                [void]$sb.AppendLine("<img src=`"$src`" alt=`"$src`" onclick=`"sc_lb(this.src)`">")
+            }
+            [void]$sb.AppendLine('</div></div>')
+        }
+        if ($step.Note) {
+            [void]$sb.AppendLine('<div class="section"><h3>備考</h3><div>' + (& $esc $step.Note) + '</div></div>')
+        }
+    }
+
+    [void]$sb.AppendLine('<div class="lightbox" id="sc_lightbox" onclick="this.classList.remove(''visible'')"><img id="sc_lb_img"></div>')
+    [void]$sb.AppendLine('<script>function sc_lb(src){var lb=document.getElementById("sc_lightbox");document.getElementById("sc_lb_img").src=src;lb.classList.add("visible");}</script>')
+    [void]$sb.AppendLine('</body></html>')
+
+    return $sb.ToString()
+}
