@@ -1033,6 +1033,30 @@ function Get-CaptureFileName {
     return "${stamp}_${suffix}${kindTag}.png"
 }
 
+function Save-BitmapPng {
+    <#
+    .SYNOPSIS
+      Saves a bitmap as PNG to a file path, bypassing GDI+'s issue with non-ASCII paths.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [System.Drawing.Bitmap]$Bitmap,
+        [Parameter(Mandatory)] [string]$Path
+    )
+    Add-Type -AssemblyName System.Drawing
+    $dir = Split-Path -Parent $Path
+    if ($dir -and -not (Test-Path -LiteralPath $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    $ms = New-Object System.IO.MemoryStream
+    try {
+        $Bitmap.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+        [System.IO.File]::WriteAllBytes($Path, $ms.ToArray())
+    } finally {
+        $ms.Dispose()
+    }
+}
+
 function Invoke-FullScreenCapture {
     [CmdletBinding()]
     [OutputType([string])]
@@ -1049,9 +1073,7 @@ function Invoke-FullScreenCapture {
     } finally {
         $g.Dispose()
     }
-    $dir = Split-Path -Parent $OutputPath
-    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    Save-BitmapPng -Bitmap $bitmap -Path $OutputPath
     $bitmap.Dispose()
     return $OutputPath
 }
@@ -1093,9 +1115,7 @@ function Invoke-ActiveWindowCapture {
     } finally {
         $g.Dispose()
     }
-    $dir = Split-Path -Parent $OutputPath
-    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    Save-BitmapPng -Bitmap $bitmap -Path $OutputPath
     $bitmap.Dispose()
     return $OutputPath
 }
@@ -1334,9 +1354,7 @@ function Invoke-RectSelectionCapture {
             (New-Object System.Drawing.Size $w, $h)
         )
     } finally { $g.Dispose() }
-    $dir = Split-Path -Parent $OutputPath
-    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    Save-BitmapPng -Bitmap $bitmap -Path $OutputPath
     $bitmap.Dispose()
     return $OutputPath
 }
@@ -1382,7 +1400,7 @@ function Save-StepCreaterCapture {
             $src = [System.Drawing.Bitmap]::FromFile($tmpRaw)
             try {
                 $annot = Add-CaptureAnnotation -SourceBitmap $src -MousePosition $mp -Caption $caption
-                $annot.Save($finalPath, [System.Drawing.Imaging.ImageFormat]::Png)
+                Save-BitmapPng -Bitmap $annot -Path $finalPath
                 $annot.Dispose()
             } finally { $src.Dispose() }
         } else {
@@ -1680,7 +1698,7 @@ function Show-MaskEditor {
         if (-not (Test-Path -LiteralPath $originalDest)) {
             Copy-Item -LiteralPath $ImagePath -Destination $originalDest -Force
         }
-        $current.Save($ImagePath, [System.Drawing.Imaging.ImageFormat]::Png)
+        Save-BitmapPng -Bitmap $current -Path $ImagePath
         $state.Saved = $true
         $win.Close()
     }.GetNewClosure())
