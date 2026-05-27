@@ -32,7 +32,9 @@
         'Add-CaptureAnnotation',
         'Invoke-RectSelectionCapture',
         'Save-StepCreaterCapture',
-        'Update-UnassignedTrayUI'
+        'Update-UnassignedTrayUI',
+        'Get-ProgressLabel',
+        'Update-ExecChecklistUI'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

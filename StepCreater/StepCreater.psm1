@@ -1221,3 +1221,35 @@ function Update-UnassignedTrayUI {
         $TrayPanel.Children.Add($btn) | Out-Null
     }
 }
+
+function Get-ProgressLabel {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)] [ProcedureDoc]$Procedure)
+    $total = $Procedure.Steps.Count
+    $done    = (@($Procedure.Steps | Where-Object { $_.Status -eq 'done'    })).Count
+    $ng      = (@($Procedure.Steps | Where-Object { $_.Status -eq 'ng'      })).Count
+    $skipped = (@($Procedure.Steps | Where-Object { $_.Status -eq 'skipped' })).Count
+    $touched = $done + $ng + $skipped
+    return ('進捗: {0} / {1} (完了 {2} / NG {3} / スキップ {4})' -f $touched, $total, $done, $ng, $skipped)
+}
+
+function Update-ExecChecklistUI {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [WorkSession]$Session,
+        [Parameter(Mandatory)] $ListBox,
+        [Parameter(Mandatory)] $ProgressLabel
+    )
+    $ListBox.Items.Clear()
+    foreach ($step in $Session.Procedure.Steps) {
+        $mark = switch ($step.Status) {
+            'done'    { '☑' }
+            'ng'      { '⚠' }
+            'skipped' { '↷' }
+            default   { '☐' }
+        }
+        [void]$ListBox.Items.Add(('{0} {1}: {2}' -f $mark, $step.Id, $step.Title))
+    }
+    $ProgressLabel.Text = Get-ProgressLabel -Procedure $Session.Procedure
+}
