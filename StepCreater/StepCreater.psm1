@@ -841,15 +841,19 @@ function Show-StepCreaterMainWindow {
     }.GetNewClosure())
 
     $window.Add_Loaded({
-        $cfg = Get-StepCreaterConfig
-        $hk = Register-StepCreaterHotkeys -Window $window -Combos @{
-            full   = $cfg.hotkeys.fullScreen
-            window = $cfg.hotkeys.window
-            rect   = $cfg.hotkeys.rect
-        } -OnFull   { & $captureHandler 'full'   } `
-           -OnWindow { & $captureHandler 'window' } `
-           -OnRect   { & $captureHandler 'rect'   }
-        $window.Tag | Add-Member -NotePropertyName HotkeyHandle -NotePropertyValue $hk -Force
+        try {
+            $cfg = Get-StepCreaterConfig
+            $hk = Register-StepCreaterHotkeys -Window $window -Combos @{
+                full   = $cfg.hotkeys.fullScreen
+                window = $cfg.hotkeys.window
+                rect   = $cfg.hotkeys.rect
+            } -OnFull   { & $captureHandler 'full'   } `
+               -OnWindow { & $captureHandler 'window' } `
+               -OnRect   { & $captureHandler 'rect'   }
+            $window.Tag | Add-Member -NotePropertyName HotkeyHandle -NotePropertyValue $hk -Force
+        } catch {
+            $c.StatusText.Text = "ホットキー登録失敗: $($_.Exception.Message)"
+        }
     }.GetNewClosure())
 
     $window.Add_Closed({
@@ -1097,16 +1101,25 @@ function Register-StepCreaterHotkeys {
     $hook = {
         param($hwndArg, $msg, $wparam, $lparam, $handled)
         $null = $hwndArg, $lparam  # required by HwndSourceHook signature; not used
-        if ($msg -ne [StepCreater.Win32]::WM_HOTKEY) { return [IntPtr]::Zero }
-        $id = [int]$wparam
-        $reg = $registrations[$id]
-        if (-not $reg) { return [IntPtr]::Zero }
-        switch ($reg.Kind) {
-            'full'   { & $OnFull   }
-            'window' { & $OnWindow }
-            'rect'   { & $OnRect   }
+        try {
+            if ($msg -ne [StepCreater.Win32]::WM_HOTKEY) { return [IntPtr]::Zero }
+            $id = [int]$wparam
+            $reg = $registrations[$id]
+            if (-not $reg) { return [IntPtr]::Zero }
+            switch ($reg.Kind) {
+                'full'   { & $OnFull   }
+                'window' { & $OnWindow }
+                'rect'   { & $OnRect   }
+            }
+            # Mark handled. $handled is a [ref] bool from native; assign via .Value
+            # with a safety net (some StrictMode configurations dislike .Value on PSReference).
+            if ($null -ne $handled) {
+                try { $handled.Value = $true } catch { Write-Verbose "hook: handled.Value assign failed: $_" }
+            }
+        } catch {
+            # Never let the hook propagate an exception — it would kill the WPF message pump.
+            Write-Verbose "hotkey hook exception: $_"
         }
-        $handled.Value = $true
         return [IntPtr]::Zero
     }.GetNewClosure()
 
