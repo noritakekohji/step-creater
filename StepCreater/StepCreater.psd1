@@ -28,7 +28,8 @@
         'Invoke-ActiveWindowCapture',
         'ConvertTo-HotkeySpec',
         'Register-StepCreaterHotkeys',
-        'Unregister-StepCreaterHotkeys'
+        'Unregister-StepCreaterHotkeys',
+        'Add-CaptureAnnotation'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

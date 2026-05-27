@@ -937,3 +937,48 @@ function Unregister-StepCreaterHotkeys {
         $Handle.Source.RemoveHook($Handle.Hook)
     }
 }
+
+function Add-CaptureAnnotation {
+    [CmdletBinding()]
+    [OutputType([System.Drawing.Bitmap])]
+    param(
+        [Parameter(Mandatory)] [System.Drawing.Bitmap]$SourceBitmap,
+        [Parameter(Mandatory)] [System.Drawing.Point]$MousePosition,
+        [Parameter()] [string]$Caption     = '',
+        [Parameter()] [int]$CaptionHeight  = 24,
+        [Parameter()] [int]$CircleRadius   = 20
+    )
+    Add-Type -AssemblyName System.Drawing
+
+    $newH = $SourceBitmap.Height + $CaptionHeight
+    $out = New-Object System.Drawing.Bitmap $SourceBitmap.Width, $newH
+    $g = [System.Drawing.Graphics]::FromImage($out)
+    try {
+        $g.DrawImage($SourceBitmap, 0, 0, $SourceBitmap.Width, $SourceBitmap.Height)
+
+        if ($MousePosition.X -ge 0 -and $MousePosition.Y -ge 0 `
+            -and $MousePosition.X -le $SourceBitmap.Width `
+            -and $MousePosition.Y -le $SourceBitmap.Height) {
+            $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(180, 220, 0, 0)), 3
+            try {
+                $r = $CircleRadius
+                $g.DrawEllipse($pen, $MousePosition.X - $r, $MousePosition.Y - $r, $r * 2, $r * 2)
+            } finally { $pen.Dispose() }
+        }
+
+        if ($CaptionHeight -gt 0 -and -not [string]::IsNullOrEmpty($Caption)) {
+            $bgBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(220, 0, 0, 0))
+            $fgBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
+            $font    = New-Object System.Drawing.Font 'Consolas', 10, ([System.Drawing.FontStyle]::Regular)
+            try {
+                $g.FillRectangle($bgBrush, 0, $SourceBitmap.Height, $SourceBitmap.Width, $CaptionHeight)
+                $g.DrawString($Caption, $font, $fgBrush, 8, $SourceBitmap.Height + 4)
+            } finally {
+                $bgBrush.Dispose(); $fgBrush.Dispose(); $font.Dispose()
+            }
+        }
+    } finally {
+        $g.Dispose()
+    }
+    return $out
+}
