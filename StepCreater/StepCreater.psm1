@@ -1389,3 +1389,117 @@ function Add-BlackoutRect {
     } finally { $g.Dispose() }
     return $out
 }
+
+function Show-MaskEditor {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory)] [string]$ImagePath
+    )
+    Add-Type -AssemblyName PresentationFramework
+    Add-Type -AssemblyName System.Drawing
+
+    if (-not (Test-Path -LiteralPath $ImagePath)) {
+        throw "Image not found: $ImagePath"
+    }
+
+    $xamlPath = Join-Path $PSScriptRoot 'ui/MaskEditor.xaml'
+    $xml = [xml](Get-Content -LiteralPath $xamlPath -Raw)
+    $reader = [System.Xml.XmlNodeReader]::new($xml)
+    $win = [Windows.Markup.XamlReader]::Load($reader)
+
+    $imgCanvas    = $win.FindName('ImgCanvas')
+    $overlay      = $win.FindName('OverlayCanvas')
+    $dragRect     = $win.FindName('DragRect')
+    $btnAddRect   = $win.FindName('BtnAddRect')
+    $btnUndo      = $win.FindName('BtnUndo')
+    $btnSave      = $win.FindName('BtnSave')
+    $btnCancel    = $win.FindName('BtnCancel')
+
+    $current = [System.Drawing.Bitmap]::FromFile($ImagePath)
+    $history = New-Object System.Collections.Generic.Stack[System.Drawing.Bitmap]
+    $state   = [pscustomobject]@{ Down = $false; X0 = 0; Y0 = 0; Saved = $false }
+
+    $refreshImage = {
+        $ms = New-Object System.IO.MemoryStream
+        $current.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+        $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
+        $bmp.BeginInit()
+        $bmp.StreamSource = $ms
+        $bmp.CacheOption = 'OnLoad'
+        $bmp.EndInit()
+        $imgCanvas.Source = $bmp
+        $imgCanvas.Width  = $current.Width
+        $imgCanvas.Height = $current.Height
+    }.GetNewClosure()
+    & $refreshImage
+
+    $overlay.Add_MouseLeftButtonDown({
+        $p = $_.GetPosition($overlay)
+        $state.Down = $true; $state.X0 = $p.X; $state.Y0 = $p.Y
+        [System.Windows.Controls.Canvas]::SetLeft($dragRect, $p.X)
+        [System.Windows.Controls.Canvas]::SetTop($dragRect, $p.Y)
+        $dragRect.Width = 0; $dragRect.Height = 0
+        $dragRect.Visibility = 'Visible'
+    }.GetNewClosure())
+
+    $overlay.Add_MouseMove({
+        if (-not $state.Down) { return }
+        $p = $_.GetPosition($overlay)
+        $x = [Math]::Min($state.X0, $p.X); $y = [Math]::Min($state.Y0, $p.Y)
+        [System.Windows.Controls.Canvas]::SetLeft($dragRect, $x)
+        [System.Windows.Controls.Canvas]::SetTop($dragRect, $y)
+        $dragRect.Width  = [Math]::Abs($p.X - $state.X0)
+        $dragRect.Height = [Math]::Abs($p.Y - $state.Y0)
+    }.GetNewClosure())
+
+    $overlay.Add_MouseLeftButtonUp({ $state.Down = $false }.GetNewClosure())
+
+    $btnAddRect.Add_Click({
+        if ($dragRect.Width -lt 2 -or $dragRect.Height -lt 2) { return }
+        $rect = New-Object System.Drawing.Rectangle `
+            ([int][System.Windows.Controls.Canvas]::GetLeft($dragRect)), `
+            ([int][System.Windows.Controls.Canvas]::GetTop($dragRect)), `
+            ([int]$dragRect.Width), ([int]$dragRect.Height)
+        $history.Push($current) | Out-Null
+        $current = Add-BlackoutRect -SourceBitmap $current -Rect $rect
+        & $refreshImage
+        $dragRect.Visibility = 'Collapsed'
+    }.GetNewClosure())
+
+    $btnUndo.Add_Click({
+        if ($history.Count -gt 0) {
+            $current.Dispose()
+            $current = $history.Pop()
+            & $refreshImage
+        }
+    }.GetNewClosure())
+
+    $btnSave.Add_Click({
+        $imagesDir = Split-Path -Parent $ImagePath
+        $originalsDir = Join-Path $imagesDir '.originals'
+        if (-not (Test-Path -LiteralPath $originalsDir)) {
+            New-Item -ItemType Directory -Path $originalsDir -Force | Out-Null
+        }
+        $originalDest = Join-Path $originalsDir (Split-Path -Leaf $ImagePath)
+        if (-not (Test-Path -LiteralPath $originalDest)) {
+            Copy-Item -LiteralPath $ImagePath -Destination $originalDest -Force
+        }
+        $current.Save($ImagePath, [System.Drawing.Imaging.ImageFormat]::Png)
+        $state.Saved = $true
+        $win.Close()
+    }.GetNewClosure())
+
+    $btnCancel.Add_Click({ $win.Close() }.GetNewClosure())
+
+    $win.Add_KeyDown({
+        if ($_.Key -eq [System.Windows.Input.Key]::Escape) { $win.Close() }
+    }.GetNewClosure())
+
+    [void]$win.ShowDialog()
+
+    foreach ($b in $history) { $b.Dispose() }
+    $current.Dispose()
+
+    return $state.Saved
+}
