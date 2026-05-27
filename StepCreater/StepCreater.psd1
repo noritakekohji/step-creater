@@ -37,7 +37,8 @@
         'Update-ExecChecklistUI',
         'Set-StepStatus',
         'Add-BlackoutRect',
-        'Show-MaskEditor'
+        'Show-MaskEditor',
+        'Get-StepDuration'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

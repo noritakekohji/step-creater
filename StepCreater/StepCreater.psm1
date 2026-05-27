@@ -1522,3 +1522,13 @@ function Show-MaskEditor {
 
     return $state.Saved
 }
+
+function Get-StepDuration {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)] [Step]$Step)
+    if (-not $Step.Started -or -not $Step.Finished) { return '-' }
+    $span = $Step.Finished - $Step.Started
+    $hours = [int][math]::Floor($span.TotalHours)
+    return ('{0:D2}:{1:D2}:{2:D2}' -f $hours, $span.Minutes, $span.Seconds)
+}
