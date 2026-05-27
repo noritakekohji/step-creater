@@ -594,6 +594,44 @@ function Show-StepCreaterMainWindow {
     }.GetNewClosure()
     $window.Tag | Add-Member -NotePropertyName ConfirmDiscard -NotePropertyValue $confirmDiscard
 
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $c.MenuOpen.Add_Click({
+        $dlg = [System.Windows.Forms.FolderBrowserDialog]::new()
+        $dlg.Description = 'ワークフォルダを選択'
+        if ($dlg.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        if (-not (& $confirmDiscard)) { return }
+        try {
+            $newSession = Open-StepCreaterWorkfolder -Path $dlg.SelectedPath
+        } catch {
+            [System.Windows.MessageBox]::Show("開けませんでした: $($_.Exception.Message)", 'エラー', 'OK', 'Error') | Out-Null
+            return
+        }
+        $window.Close()
+        Show-StepCreaterMainWindow -Session $newSession
+    }.GetNewClosure())
+
+    $c.MenuNew.Add_Click({
+        $dlg = [System.Windows.Forms.FolderBrowserDialog]::new()
+        $dlg.Description = '新規ワークフォルダの作成先を選択'
+        if ($dlg.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+        Add-Type -AssemblyName Microsoft.VisualBasic
+        $title = [Microsoft.VisualBasic.Interaction]::InputBox('手順書のタイトル', '新規作成', '新規手順書')
+        if ([string]::IsNullOrWhiteSpace($title)) { return }
+        if (-not (& $confirmDiscard)) { return }
+
+        try {
+            New-StepCreaterWorkfolder -Path $dlg.SelectedPath -Title $title | Out-Null
+            $newSession = Open-StepCreaterWorkfolder -Path $dlg.SelectedPath
+        } catch {
+            [System.Windows.MessageBox]::Show("作成に失敗: $($_.Exception.Message)", 'エラー', 'OK', 'Error') | Out-Null
+            return
+        }
+        $window.Close()
+        Show-StepCreaterMainWindow -Session $newSession
+    }.GetNewClosure())
+
     $window.Add_Closing({
         $e = $args[1]
         if (-not (& $confirmDiscard)) { $e.Cancel = $true }
