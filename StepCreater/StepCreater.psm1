@@ -1373,3 +1373,19 @@ function Update-ExecChecklistUI {
     }
     $ProgressLabel.Text = Get-ProgressLabel -Procedure $Session.Procedure
 }
+
+function Add-BlackoutRect {
+    [CmdletBinding()]
+    [OutputType([System.Drawing.Bitmap])]
+    param(
+        [Parameter(Mandatory)] [System.Drawing.Bitmap]$SourceBitmap,
+        [Parameter(Mandatory)] [System.Drawing.Rectangle]$Rect
+    )
+    Add-Type -AssemblyName System.Drawing
+    $out = New-Object System.Drawing.Bitmap $SourceBitmap
+    $g = [System.Drawing.Graphics]::FromImage($out)
+    try {
+        $g.FillRectangle([System.Drawing.Brushes]::Black, $Rect)
+    } finally { $g.Dispose() }
+    return $out
+}

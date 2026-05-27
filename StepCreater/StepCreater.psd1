@@ -35,7 +35,8 @@
         'Update-UnassignedTrayUI',
         'Get-ProgressLabel',
         'Update-ExecChecklistUI',
-        'Set-StepStatus'
+        'Set-StepStatus',
+        'Add-BlackoutRect'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
