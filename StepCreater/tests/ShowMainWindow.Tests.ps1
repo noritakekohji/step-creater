@@ -215,3 +215,35 @@ Describe 'Template insertion menu' {
         $script:win7.FindName('DirtyText').Text | Should -Be ''
     }
 }
+
+Describe 'Mode toggle (Edit/Execute)' {
+    BeforeEach {
+        $script:tmpM = Join-Path $TestDrive ("wf-mode-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-StepCreaterWorkfolder -Path $script:tmpM -Title 'Mode Test' | Out-Null
+        $script:sessionM = Open-StepCreaterWorkfolder -Path $script:tmpM
+        $script:sessionM.Procedure.AddStep('Step A') | Out-Null
+        $script:sessionM.Procedure.AddStep('Step B') | Out-Null
+    }
+
+    It 'starts in Edit mode (EditPanel visible)' {
+        $win = Show-StepCreaterMainWindow -Session $script:sessionM -NoShow
+        $win.FindName('EditPanel').Visibility    | Should -Be 'Visible'
+        $win.FindName('ExecutePanel').Visibility | Should -Be 'Collapsed'
+    }
+
+    It 'switches to Execute mode and populates checklist' {
+        $win = Show-StepCreaterMainWindow -Session $script:sessionM -NoShow
+        $win.FindName('TabExecute').IsChecked = $true
+        $win.FindName('EditPanel').Visibility    | Should -Be 'Collapsed'
+        $win.FindName('ExecutePanel').Visibility | Should -Be 'Visible'
+        $win.FindName('ExecChecklist').Items.Count | Should -Be 2
+        $win.FindName('ProgressLabel').Text | Should -Match '進捗: 0 / 2'
+    }
+
+    It 'starts directly in Execute mode when Session.Mode is Execute' {
+        $script:sessionM.Mode = 'Execute'
+        $win = Show-StepCreaterMainWindow -Session $script:sessionM -NoShow
+        $win.FindName('ExecutePanel').Visibility | Should -Be 'Visible'
+        $win.FindName('ExecStepTitle').Text | Should -Match 'Step A'
+    }
+}

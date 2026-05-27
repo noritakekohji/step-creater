@@ -442,7 +442,11 @@ function Show-StepCreaterMainWindow {
         'WorkfolderPath','BtnSave',
         'StepList','BtnAdd','BtnDelete','BtnUp','BtnDown',
         'TxtTitle','CboStatus','TxtBody','TxtCommand','TxtExpected','TxtNote',
-        'UnassignedTray'
+        'UnassignedTray',
+        'EditPanel','ExecutePanel',
+        'ProgressLabel','ExecChecklist',
+        'ExecStepTitle','ExecBody','ExecCommand','BtnCopyCommand','ExecExpected',
+        'ExecEvidenceTray','BtnComplete','BtnNg','BtnSkip'
     )) { $c[$name] = $window.FindName($name) }
 
     $c.WorkfolderPath.Text = $Session.WorkFolderPath
@@ -600,6 +604,64 @@ function Show-StepCreaterMainWindow {
         Update-DirtyIndicator -Window $window
     }.GetNewClosure()
     Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
+
+    # ---- Execute mode helpers ----
+    $loadExecStep = {
+        param($idx)
+        if ($idx -lt 0 -or $idx -ge $Session.Procedure.Steps.Count) {
+            $c.ExecStepTitle.Text = ''
+            $c.ExecBody.Text      = ''
+            $c.ExecCommand.Text   = ''
+            $c.ExecExpected.Text  = ''
+            $c.ExecEvidenceTray.Children.Clear()
+            return
+        }
+        $step = $Session.Procedure.Steps[$idx]
+        $c.ExecStepTitle.Text = "Step $($step.Id): $($step.Title)"
+        $c.ExecBody.Text      = $step.BodyMarkdown
+        $c.ExecCommand.Text   = $step.Command
+        $c.ExecExpected.Text  = $step.ExpectedResult
+
+        $c.ExecEvidenceTray.Children.Clear()
+        foreach ($ev in $step.Evidence) {
+            $path = Join-Path $Session.WorkFolderPath ("images/" + $ev.FileName)
+            if (-not (Test-Path -LiteralPath $path)) { continue }
+            $img = New-Object System.Windows.Controls.Image
+            $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
+            $bmp.BeginInit(); $bmp.CacheOption = 'OnLoad'
+            $bmp.UriSource = (New-Object System.Uri $path)
+            $bmp.DecodePixelWidth = 200
+            $bmp.EndInit()
+            $img.Source = $bmp; $img.Stretch = 'Uniform'; $img.Width = 100; $img.Height = 70; $img.Margin = '2'
+            $img.ToolTip = $ev.FileName
+            $c.ExecEvidenceTray.Children.Add($img) | Out-Null
+        }
+    }.GetNewClosure()
+
+    $applyMode = {
+        param($mode)
+        $Session.Mode = $mode
+        if ($mode -eq 'Edit') {
+            $c.EditPanel.Visibility    = 'Visible'
+            $c.ExecutePanel.Visibility = 'Collapsed'
+        } else {
+            $c.EditPanel.Visibility    = 'Collapsed'
+            $c.ExecutePanel.Visibility = 'Visible'
+            Update-ExecChecklistUI -Session $Session -ListBox $c.ExecChecklist -ProgressLabel $c.ProgressLabel
+            $idx = if ($c.ExecChecklist.SelectedIndex -ge 0) { $c.ExecChecklist.SelectedIndex } else { 0 }
+            $c.ExecChecklist.SelectedIndex = $idx
+            & $loadExecStep $idx
+        }
+    }.GetNewClosure()
+
+    $c.TabEdit.Add_Checked({    & $applyMode 'Edit'    }.GetNewClosure())
+    $c.TabExecute.Add_Checked({ & $applyMode 'Execute' }.GetNewClosure())
+
+    $c.ExecChecklist.Add_SelectionChanged({
+        & $loadExecStep $c.ExecChecklist.SelectedIndex
+    }.GetNewClosure())
+
+    & $applyMode $Session.Mode
 
     $confirmDiscard = {
         $current = Get-ProcedureHash -Procedure $Session.Procedure
