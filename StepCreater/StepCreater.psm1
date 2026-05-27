@@ -513,6 +513,8 @@ function Show-StepCreaterMainWindow {
         Add-ProcedureStepAt -Procedure $Session.Procedure -Index $idx -Title '新しい手順' | Out-Null
         Update-StepListUI -Session $Session -ListBox $c.StepList
         $c.StepList.SelectedIndex = $idx
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
         Update-DirtyIndicator -Window $window
     }.GetNewClosure())
 
@@ -528,6 +530,8 @@ function Show-StepCreaterMainWindow {
         if ($Session.Procedure.Steps.Count -gt 0) {
             $c.StepList.SelectedIndex = [Math]::Min($idx, $Session.Procedure.Steps.Count - 1)
         }
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
         Update-DirtyIndicator -Window $window
     }.GetNewClosure())
 
@@ -537,6 +541,8 @@ function Show-StepCreaterMainWindow {
         Move-ProcedureStep -Procedure $Session.Procedure -Index $idx -Direction Up
         Update-StepListUI -Session $Session -ListBox $c.StepList
         $c.StepList.SelectedIndex = $idx - 1
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
         Update-DirtyIndicator -Window $window
     }.GetNewClosure())
 
@@ -546,8 +552,31 @@ function Show-StepCreaterMainWindow {
         Move-ProcedureStep -Procedure $Session.Procedure -Index $idx -Direction Down
         Update-StepListUI -Session $Session -ListBox $c.StepList
         $c.StepList.SelectedIndex = $idx + 1
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
         Update-DirtyIndicator -Window $window
     }.GetNewClosure())
+
+    $doSave = {
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+        Update-DirtyIndicator -Window $window
+        $c.StatusText.Text = "保存しました ($(Get-Date -Format HH:mm:ss))"
+    }
+    $c.BtnSave.Add_Click($doSave.GetNewClosure())
+    $c.MenuSave.Add_Click($doSave.GetNewClosure())
+    $c.MenuExit.Add_Click({ $window.Close() }.GetNewClosure())
+
+    # Ctrl+S keyboard shortcut
+    $saveCommand = [System.Windows.Input.RoutedCommand]::new()
+    $cmdBinding  = [System.Windows.Input.CommandBinding]::new($saveCommand, { & $doSave }.GetNewClosure())
+    $window.CommandBindings.Add($cmdBinding) | Out-Null
+    $kb = [System.Windows.Input.KeyBinding]::new(
+        $saveCommand,
+        [System.Windows.Input.Key]::S,
+        [System.Windows.Input.ModifierKeys]::Control
+    )
+    $window.InputBindings.Add($kb) | Out-Null
 
     $window.Tag = [pscustomobject]@{
         Session  = $Session
@@ -581,4 +610,13 @@ function Update-DirtyIndicator {
     $current = Get-ProcedureHash -Procedure $tag.Session.Procedure
     $isDirty = ($current -ne $tag.Baseline)
     $tag.Controls.DirtyText.Text = if ($isDirty) { '● 未保存' } else { '' }
+}
+
+function Save-WorkSession {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [WorkSession]$Session)
+    $Session.Procedure.Updated = Get-Date
+    $md = Write-Procedure -Procedure $Session.Procedure
+    $mdPath = Join-Path $Session.WorkFolderPath 'procedure.md'
+    Set-Content -LiteralPath $mdPath -Value $md -Encoding UTF8
 }

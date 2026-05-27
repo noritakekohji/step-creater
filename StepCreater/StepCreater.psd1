@@ -20,7 +20,8 @@
         'Get-ProcedureHash',
         'Show-StepCreaterMainWindow',
         'Update-StepListUI',
-        'Update-DirtyIndicator'
+        'Update-DirtyIndicator',
+        'Save-WorkSession'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

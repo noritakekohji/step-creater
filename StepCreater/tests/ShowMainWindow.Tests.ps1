@@ -104,3 +104,37 @@ Describe 'Step list operation buttons' {
         $script:session3.Procedure.Steps[1].Title | Should -Be 'A'
     }
 }
+
+Describe 'Save and auto-save' {
+    BeforeEach {
+        $script:tmp4 = Join-Path $TestDrive ("wf-save-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-StepCreaterWorkfolder -Path $script:tmp4 -Title 'Save Test' | Out-Null
+        $script:session4 = Open-StepCreaterWorkfolder -Path $script:tmp4
+        $script:session4.Procedure.AddStep('A') | Out-Null
+        $script:win4 = Show-StepCreaterMainWindow -Session $script:session4 -NoShow
+    }
+
+    It 'Save-WorkSession writes procedure.md with updated content' {
+        $script:session4.Procedure.Steps[0].BodyMarkdown = 'New body'
+        Save-WorkSession -Session $script:session4
+        $md = Get-Content (Join-Path $script:tmp4 'procedure.md') -Raw
+        $md | Should -Match 'New body'
+    }
+
+    It 'BtnSave click triggers save and clears dirty indicator' {
+        $script:session4.Procedure.Steps[0].BodyMarkdown = 'X'   # make dirty
+        $btn = $script:win4.FindName('BtnSave')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $md = Get-Content (Join-Path $script:tmp4 'procedure.md') -Raw
+        $md | Should -Match 'X'
+        $script:win4.FindName('DirtyText').Text | Should -Be ''
+    }
+
+    It 'BtnAdd auto-saves immediately' {
+        $btn = $script:win4.FindName('BtnAdd')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $md = Get-Content (Join-Path $script:tmp4 'procedure.md') -Raw
+        $md | Should -Match '新しい手順'
+        $script:win4.FindName('DirtyText').Text | Should -Be ''
+    }
+}
