@@ -23,7 +23,8 @@
         'Update-DirtyIndicator',
         'Save-WorkSession',
         'Initialize-StepCreaterWin32',
-        'Get-CaptureFileName'
+        'Get-CaptureFileName',
+        'Invoke-FullScreenCapture'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

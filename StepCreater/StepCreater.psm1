@@ -767,3 +767,26 @@ function Get-CaptureFileName {
     $kindTag = switch ($Kind) { 'full' { '' } 'window' { '_win' } 'rect' { '_rect' } }
     return "${stamp}_${suffix}${kindTag}.png"
 }
+
+function Invoke-FullScreenCapture {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)] [string]$OutputPath)
+
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+
+    $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+    $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+    $g = [System.Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $g.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+    } finally {
+        $g.Dispose()
+    }
+    $dir = Split-Path -Parent $OutputPath
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $bitmap.Dispose()
+    return $OutputPath
+}
