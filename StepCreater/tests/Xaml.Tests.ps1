@@ -40,3 +40,21 @@
         }
     }
 }
+Describe 'SettingsDialog.xaml' {
+    BeforeAll {
+        Add-Type -AssemblyName PresentationFramework
+        $script:sxPath = Join-Path $PSScriptRoot '..\ui\SettingsDialog.xaml'
+    }
+
+    It 'file exists' { Test-Path $script:sxPath | Should -BeTrue }
+
+    It 'parses without error' {
+        $xml = [xml](Get-Content -LiteralPath $script:sxPath -Raw)
+        $reader = [System.Xml.XmlNodeReader]::new($xml)
+        $win = [Windows.Markup.XamlReader]::Load($reader)
+        $win.GetType().Name | Should -Be 'Window'
+        foreach ($n in @('TxtHkFull','TxtHkWindow','TxtHkRect','ChkAnnotation','BtnOk','BtnCancel')) {
+            $win.FindName($n) | Should -Not -BeNullOrEmpty
+        }
+    }
+}

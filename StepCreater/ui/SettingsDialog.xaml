@@ -1,0 +1,38 @@
+﻿<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="設定" Height="380" Width="480"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="BtnOk"     Content="OK"       Padding="14,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnCancel" Content="キャンセル" Padding="14,4"/>
+        </StackPanel>
+
+        <StackPanel>
+            <TextBlock FontWeight="Bold" Text="ホットキー" Margin="0,0,0,6"/>
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="全画面" VerticalAlignment="Center"/>
+                <TextBox   Grid.Row="0" Grid.Column="1" x:Name="TxtHkFull"   Margin="0,2"/>
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="アクティブウィンドウ" VerticalAlignment="Center"/>
+                <TextBox   Grid.Row="1" Grid.Column="1" x:Name="TxtHkWindow" Margin="0,2"/>
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="矩形選択" VerticalAlignment="Center"/>
+                <TextBox   Grid.Row="2" Grid.Column="1" x:Name="TxtHkRect"   Margin="0,2"/>
+            </Grid>
+
+            <TextBlock FontWeight="Bold" Text="アノテーション" Margin="0,8,0,6"/>
+            <CheckBox x:Name="ChkAnnotation" Content="マウス位置に赤丸とキャプションバーを追加する"/>
+
+            <TextBlock FontStyle="Italic" Foreground="DimGray" TextWrapping="Wrap" Margin="0,16,0,0"
+                       Text="例: Ctrl+F12, Ctrl+Shift+F11, Alt+S。OKで保存し、ホットキーは即時再登録されます。"/>
+        </StackPanel>
+    </DockPanel>
+</Window>
