@@ -508,6 +508,47 @@ function Show-StepCreaterMainWindow {
     }
     $c.CboStatus.Add_SelectionChanged($saveEdits)
 
+    $c.BtnAdd.Add_Click({
+        $idx = if ($c.StepList.SelectedIndex -ge 0) { $c.StepList.SelectedIndex + 1 } else { $Session.Procedure.Steps.Count }
+        Add-ProcedureStepAt -Procedure $Session.Procedure -Index $idx -Title '新しい手順' | Out-Null
+        Update-StepListUI -Session $Session -ListBox $c.StepList
+        $c.StepList.SelectedIndex = $idx
+        Update-DirtyIndicator -Window $window
+    }.GetNewClosure())
+
+    $c.BtnDelete.Add_Click({
+        $idx = $c.StepList.SelectedIndex
+        if ($idx -lt 0) { return }
+        $confirm = [System.Windows.MessageBox]::Show(
+            "Step $($Session.Procedure.Steps[$idx].Id) を削除しますか？",
+            '確認', 'YesNo', 'Question')
+        if ($confirm -ne 'Yes') { return }
+        Remove-ProcedureStep -Procedure $Session.Procedure -Index $idx
+        Update-StepListUI -Session $Session -ListBox $c.StepList
+        if ($Session.Procedure.Steps.Count -gt 0) {
+            $c.StepList.SelectedIndex = [Math]::Min($idx, $Session.Procedure.Steps.Count - 1)
+        }
+        Update-DirtyIndicator -Window $window
+    }.GetNewClosure())
+
+    $c.BtnUp.Add_Click({
+        $idx = $c.StepList.SelectedIndex
+        if ($idx -lt 1) { return }
+        Move-ProcedureStep -Procedure $Session.Procedure -Index $idx -Direction Up
+        Update-StepListUI -Session $Session -ListBox $c.StepList
+        $c.StepList.SelectedIndex = $idx - 1
+        Update-DirtyIndicator -Window $window
+    }.GetNewClosure())
+
+    $c.BtnDown.Add_Click({
+        $idx = $c.StepList.SelectedIndex
+        if ($idx -lt 0 -or $idx -ge $Session.Procedure.Steps.Count - 1) { return }
+        Move-ProcedureStep -Procedure $Session.Procedure -Index $idx -Direction Down
+        Update-StepListUI -Session $Session -ListBox $c.StepList
+        $c.StepList.SelectedIndex = $idx + 1
+        Update-DirtyIndicator -Window $window
+    }.GetNewClosure())
+
     $window.Tag = [pscustomobject]@{
         Session  = $Session
         Controls = $c

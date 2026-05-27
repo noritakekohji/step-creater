@@ -1,4 +1,4 @@
-using module '..\StepCreater.psd1'
+﻿using module '..\StepCreater.psd1'
 
 Describe 'Show-StepCreaterMainWindow -NoShow' {
     BeforeAll {
@@ -49,5 +49,58 @@ Describe 'Detail editor wiring' {
         $win.FindName('TxtExpected').Text | Should -Be 'List of processes'
         $win.FindName('TxtNote').Text     | Should -Be 'A note'
         ($win.FindName('CboStatus').SelectedItem.Content) | Should -Be 'done'
+    }
+}
+
+Describe 'Step list operation buttons' {
+    BeforeEach {
+        $script:tmp3 = Join-Path $TestDrive ("wf-ops-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-StepCreaterWorkfolder -Path $script:tmp3 -Title 'Ops Test' | Out-Null
+        $script:session3 = Open-StepCreaterWorkfolder -Path $script:tmp3
+        $script:session3.Procedure.AddStep('A') | Out-Null
+        $script:session3.Procedure.AddStep('B') | Out-Null
+        $script:session3.Procedure.AddStep('C') | Out-Null
+        $script:win3 = Show-StepCreaterMainWindow -Session $script:session3 -NoShow
+    }
+
+    It 'BtnAdd inserts after selected step' {
+        $script:win3.FindName('StepList').SelectedIndex = 1   # select B
+        $btn = $script:win3.FindName('BtnAdd')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $script:session3.Procedure.Steps.Count | Should -Be 4
+        $script:session3.Procedure.Steps[2].Title | Should -Be '新しい手順'
+        # IDs renumbered
+        $script:session3.Procedure.Steps[3].Id | Should -Be '04'
+    }
+
+    It 'BtnAdd appends when nothing selected' {
+        $script:win3.FindName('StepList').SelectedIndex = -1
+        $btn = $script:win3.FindName('BtnAdd')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $script:session3.Procedure.Steps.Count | Should -Be 4
+        $script:session3.Procedure.Steps[3].Title | Should -Be '新しい手順'
+    }
+
+    It 'BtnUp moves selected step up' {
+        $script:win3.FindName('StepList').SelectedIndex = 2   # select C
+        $btn = $script:win3.FindName('BtnUp')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $script:session3.Procedure.Steps[1].Title | Should -Be 'C'
+        $script:session3.Procedure.Steps[2].Title | Should -Be 'B'
+    }
+
+    It 'BtnUp at top is no-op' {
+        $script:win3.FindName('StepList').SelectedIndex = 0
+        $btn = $script:win3.FindName('BtnUp')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $script:session3.Procedure.Steps[0].Title | Should -Be 'A'
+    }
+
+    It 'BtnDown moves selected step down' {
+        $script:win3.FindName('StepList').SelectedIndex = 0   # select A
+        $btn = $script:win3.FindName('BtnDown')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $script:session3.Procedure.Steps[0].Title | Should -Be 'B'
+        $script:session3.Procedure.Steps[1].Title | Should -Be 'A'
     }
 }
