@@ -9,6 +9,7 @@
                 <MenuItem x:Name="MenuOpen" Header="ワークフォルダを開く(_O)..." />
                 <Separator/>
                 <MenuItem x:Name="MenuSave" Header="保存(_S)" InputGestureText="Ctrl+S"/>
+                <MenuItem x:Name="MenuExportHtml" Header="HTML出力(_E)..."/>
                 <Separator/>
                 <MenuItem x:Name="MenuExit" Header="終了(_X)"/>
             </MenuItem>

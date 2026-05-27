@@ -436,7 +436,7 @@ function Show-StepCreaterMainWindow {
 
     $c = @{}
     foreach ($name in @(
-        'MenuNew','MenuOpen','MenuSave','MenuExit','MenuTemplates',
+        'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates',
         'StatusText','DirtyText',
         'TabEdit','TabExecute','TabCapture',
         'WorkfolderPath','BtnSave',
@@ -570,6 +570,17 @@ function Show-StepCreaterMainWindow {
     }
     $c.BtnSave.Add_Click($doSave.GetNewClosure())
     $c.MenuSave.Add_Click($doSave.GetNewClosure())
+    $c.MenuExportHtml.Add_Click({
+        Save-WorkSession -Session $Session
+        $htmlPath = Join-Path $Session.WorkFolderPath 'procedure.html'
+        $html = ConvertTo-ProcedureHtml -Procedure $Session.Procedure
+        Set-Content -LiteralPath $htmlPath -Value $html -Encoding UTF8
+        $c.StatusText.Text = "HTML出力: $htmlPath"
+        $r = [System.Windows.MessageBox]::Show(
+            "出力しました:`n$htmlPath`n`nブラウザで開きますか?",
+            'HTML出力', 'YesNo', 'Information')
+        if ($r -eq 'Yes') { Start-Process $htmlPath }
+    }.GetNewClosure())
     $c.MenuExit.Add_Click({ $window.Close() }.GetNewClosure())
 
     # Ctrl+S keyboard shortcut
