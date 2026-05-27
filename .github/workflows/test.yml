@@ -1,0 +1,56 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache PowerShell modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\Documents\WindowsPowerShell\Modules
+            ~\Documents\PowerShell\Modules
+          key: ps-modules-${{ runner.os }}-pester5.5.0-analyzer-invokebuild
+
+      - name: Install required modules
+        shell: powershell
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          if (-not (Get-Module -ListAvailable -Name Pester | Where-Object Version -ge '5.5.0')) {
+              Install-Module -Name Pester -RequiredVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
+          }
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+              Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+          }
+          if (-not (Get-Module -ListAvailable -Name InvokeBuild)) {
+              Install-Module -Name InvokeBuild -Force -Scope CurrentUser
+          }
+          Get-Module -ListAvailable Pester, PSScriptAnalyzer, InvokeBuild |
+            Select-Object Name, Version |
+            Format-Table
+
+      - name: Run lint + tests
+        shell: powershell
+        run: |
+          Invoke-Build -File StepCreater/StepCreater.build.ps1 All
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stepcreater-logs
+          path: |
+            **/*.log
+            TestResults.xml
+          if-no-files-found: ignore
