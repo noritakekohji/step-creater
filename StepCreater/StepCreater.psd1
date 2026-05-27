@@ -30,7 +30,8 @@
         'Register-StepCreaterHotkeys',
         'Unregister-StepCreaterHotkeys',
         'Add-CaptureAnnotation',
-        'Invoke-RectSelectionCapture'
+        'Invoke-RectSelectionCapture',
+        'Save-StepCreaterCapture'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

@@ -1066,3 +1066,71 @@ function Invoke-RectSelectionCapture {
     $bitmap.Dispose()
     return $OutputPath
 }
+
+function Save-StepCreaterCapture {
+    [CmdletBinding()]
+    [OutputType([ScreenshotRef])]
+    param(
+        [Parameter(Mandatory)] [WorkSession]$Session,
+        [Parameter(Mandatory)] [ValidateSet('full','window','rect')] [string]$Kind,
+        [Parameter()] [string]$StepId = ''
+    )
+    Initialize-StepCreaterWin32
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $cfg = Get-StepCreaterConfig
+    $now = Get-Date
+    $name = Get-CaptureFileName -Kind $Kind -StepId $StepId -Timestamp $now
+    $imagesDir = Join-Path $Session.WorkFolderPath 'images'
+    if (-not (Test-Path -LiteralPath $imagesDir)) {
+        New-Item -ItemType Directory -Path $imagesDir -Force | Out-Null
+    }
+    $tmpRaw = Join-Path $env:TEMP ("sc-raw-" + [guid]::NewGuid() + ".png")
+    try {
+        $captured = switch ($Kind) {
+            'full'   { Invoke-FullScreenCapture    -OutputPath $tmpRaw }
+            'window' { Invoke-ActiveWindowCapture  -OutputPath $tmpRaw }
+            'rect'   { Invoke-RectSelectionCapture -OutputPath $tmpRaw }
+        }
+        if (-not $captured) { return $null }
+
+        $finalPath = Join-Path $imagesDir $name
+        if ($cfg.annotationEnabled) {
+            $title = New-Object System.Text.StringBuilder 256
+            $hwnd = [StepCreater.Win32]::GetForegroundWindow()
+            [StepCreater.Win32]::GetWindowText($hwnd, $title, $title.Capacity) | Out-Null
+            $caption = ('{0} | {1}' -f $title.ToString(), $now.ToString('HH:mm:ss'))
+            $cursor = [System.Windows.Forms.Cursor]::Position
+            $vs = [System.Windows.Forms.SystemInformation]::VirtualScreen
+            $mp = New-Object System.Drawing.Point ($cursor.X - $vs.Left), ($cursor.Y - $vs.Top)
+
+            $src = [System.Drawing.Bitmap]::FromFile($tmpRaw)
+            try {
+                $annot = Add-CaptureAnnotation -SourceBitmap $src -MousePosition $mp -Caption $caption
+                $annot.Save($finalPath, [System.Drawing.Imaging.ImageFormat]::Png)
+                $annot.Dispose()
+            } finally { $src.Dispose() }
+        } else {
+            Move-Item -LiteralPath $tmpRaw -Destination $finalPath -Force
+        }
+    } finally {
+        if (Test-Path -LiteralPath $tmpRaw) { Remove-Item -LiteralPath $tmpRaw -Force }
+    }
+
+    $ref = [ScreenshotRef]::new($name, $now, $Kind)
+    if ([string]::IsNullOrEmpty($StepId)) {
+        $Session.UnassignedScreenshots.Add($ref) | Out-Null
+    } else {
+        $idx = -1
+        for ($i = 0; $i -lt $Session.Procedure.Steps.Count; $i++) {
+            if ($Session.Procedure.Steps[$i].Id -eq $StepId) { $idx = $i; break }
+        }
+        if ($idx -ge 0) {
+            $Session.Procedure.Steps[$idx].Evidence.Add($ref) | Out-Null
+        } else {
+            $Session.UnassignedScreenshots.Add($ref) | Out-Null
+        }
+    }
+    return $ref
+}
