@@ -247,3 +247,50 @@ Describe 'Mode toggle (Edit/Execute)' {
         $win.FindName('ExecStepTitle').Text | Should -Match 'Step A'
     }
 }
+
+Describe 'Execute mode buttons' {
+    BeforeEach {
+        $script:tmpE = Join-Path $TestDrive ("wf-exec-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-StepCreaterWorkfolder -Path $script:tmpE -Title 'Exec Test' | Out-Null
+        $script:sessionE = Open-StepCreaterWorkfolder -Path $script:tmpE
+        $a = $script:sessionE.Procedure.AddStep('A'); $a.Command = 'Get-Process'
+        $script:sessionE.Procedure.AddStep('B') | Out-Null
+        $script:sessionE.Procedure.AddStep('C') | Out-Null
+        $script:sessionE.Mode = 'Execute'
+        $script:winE = Show-StepCreaterMainWindow -Session $script:sessionE -NoShow
+    }
+
+    It 'BtnComplete sets done and moves to next step' {
+        $script:winE.FindName('ExecChecklist').SelectedIndex = 0
+        $btn = $script:winE.FindName('BtnComplete')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $script:sessionE.Procedure.Steps[0].Status | Should -Be 'done'
+        $script:sessionE.Procedure.Steps[0].Started  | Should -Not -BeNullOrEmpty
+        $script:sessionE.Procedure.Steps[0].Finished | Should -Not -BeNullOrEmpty
+        $script:winE.FindName('ExecChecklist').SelectedIndex | Should -Be 1
+    }
+
+    It 'BtnNg sets ng and stays on current step' {
+        $script:winE.FindName('ExecChecklist').SelectedIndex = 1
+        $btn = $script:winE.FindName('BtnNg')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $script:sessionE.Procedure.Steps[1].Status | Should -Be 'ng'
+        $script:winE.FindName('ExecChecklist').SelectedIndex | Should -Be 1
+    }
+
+    It 'BtnSkip sets skipped and advances' {
+        $script:winE.FindName('ExecChecklist').SelectedIndex = 0
+        $btn = $script:winE.FindName('BtnSkip')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $script:sessionE.Procedure.Steps[0].Status | Should -Be 'skipped'
+        $script:winE.FindName('ExecChecklist').SelectedIndex | Should -Be 1
+    }
+
+    It 'auto-saves procedure.md after status change' {
+        $script:winE.FindName('ExecChecklist').SelectedIndex = 0
+        $btn = $script:winE.FindName('BtnComplete')
+        $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
+        $md = Get-Content (Join-Path $script:tmpE 'procedure.md') -Raw
+        $md | Should -Match 'status: done'
+    }
+}

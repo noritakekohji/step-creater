@@ -663,6 +663,37 @@ function Show-StepCreaterMainWindow {
 
     & $applyMode $Session.Mode
 
+    $c.BtnCopyCommand.Add_Click({
+        $idx = $c.ExecChecklist.SelectedIndex
+        if ($idx -lt 0) { return }
+        $cmd = $Session.Procedure.Steps[$idx].Command
+        if ([string]::IsNullOrWhiteSpace($cmd)) { return }
+        [System.Windows.Clipboard]::SetText($cmd)
+        $c.StatusText.Text = ('コマンドをコピーしました ({0})' -f (Get-Date -Format HH:mm:ss))
+    }.GetNewClosure())
+
+    $advanceTo = {
+        param($newStatus, $moveNext)
+        $idx = $c.ExecChecklist.SelectedIndex
+        if ($idx -lt 0) { return }
+        $step = $Session.Procedure.Steps[$idx]
+        Set-StepStatus -Step $step -Status $newStatus
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+        Update-DirtyIndicator -Window $window
+        Update-ExecChecklistUI -Session $Session -ListBox $c.ExecChecklist -ProgressLabel $c.ProgressLabel
+        if ($moveNext -and ($idx + 1) -lt $Session.Procedure.Steps.Count) {
+            $c.ExecChecklist.SelectedIndex = $idx + 1
+        } else {
+            $c.ExecChecklist.SelectedIndex = $idx
+            & $loadExecStep $idx
+        }
+    }.GetNewClosure()
+
+    $c.BtnComplete.Add_Click({ & $advanceTo 'done'    $true  }.GetNewClosure())
+    $c.BtnNg.Add_Click({       & $advanceTo 'ng'      $false }.GetNewClosure())
+    $c.BtnSkip.Add_Click({     & $advanceTo 'skipped' $true  }.GetNewClosure())
+
     $confirmDiscard = {
         $current = Get-ProcedureHash -Procedure $Session.Procedure
         if ($current -eq $window.Tag.Baseline) { return $true }
