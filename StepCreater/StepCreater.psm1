@@ -834,3 +834,31 @@ function Invoke-ActiveWindowCapture {
     $bitmap.Dispose()
     return $OutputPath
 }
+function ConvertTo-HotkeySpec {
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
+    param([Parameter(Mandatory)] [string]$Combo)
+
+    $tokens = $Combo -split '\+' | ForEach-Object { $_.Trim().ToLowerInvariant() }
+    $mods = 0
+    $keyToken = $null
+    foreach ($t in $tokens) {
+        switch ($t) {
+            'ctrl'    { $mods = $mods -bor 0x2 }
+            'control' { $mods = $mods -bor 0x2 }
+            'shift'   { $mods = $mods -bor 0x4 }
+            'alt'     { $mods = $mods -bor 0x1 }
+            'win'     { $mods = $mods -bor 0x8 }
+            default   { $keyToken = $t }
+        }
+    }
+    if (-not $keyToken) { throw "No key in combo '$Combo'." }
+
+    $vk = switch -Regex ($keyToken) {
+        '^f([1-9]|1[0-2])$' { 0x6F + [int]$matches[1] }
+        '^[a-z]$'           { [int][char]([string]$keyToken).ToUpperInvariant() }
+        '^[0-9]$'           { [int][char][string]$keyToken }
+        default             { throw "Unknown key '$keyToken' in combo '$Combo'." }
+    }
+    return [pscustomobject]@{ Modifiers = $mods; VKey = $vk }
+}

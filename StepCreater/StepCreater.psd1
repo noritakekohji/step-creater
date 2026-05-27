@@ -25,7 +25,8 @@
         'Initialize-StepCreaterWin32',
         'Get-CaptureFileName',
         'Invoke-FullScreenCapture',
-        'Invoke-ActiveWindowCapture'
+        'Invoke-ActiveWindowCapture',
+        'ConvertTo-HotkeySpec'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
