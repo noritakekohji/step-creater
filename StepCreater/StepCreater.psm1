@@ -584,6 +584,28 @@ function Show-StepCreaterMainWindow {
         Baseline = (Get-ProcedureHash -Procedure $Session.Procedure)
     }
 
+    $confirmDiscard = {
+        $current = Get-ProcedureHash -Procedure $Session.Procedure
+        if ($current -eq $window.Tag.Baseline) { return $true }
+        $r = [System.Windows.MessageBox]::Show(
+            '未保存の変更があります。終了しますか？',
+            '確認', 'OKCancel', 'Warning')
+        return ($r -eq 'OK')
+    }.GetNewClosure()
+    $window.Tag | Add-Member -NotePropertyName ConfirmDiscard -NotePropertyValue $confirmDiscard
+
+    $window.Add_Closing({
+        $e = $args[1]
+        if (-not (& $confirmDiscard)) { $e.Cancel = $true }
+    }.GetNewClosure())
+
+    $window.Add_KeyDown({
+        $e = $args[1]
+        if ($e.Key -eq [System.Windows.Input.Key]::Escape) {
+            $window.Close()
+        }
+    }.GetNewClosure())
+
     if ($NoShow) { return $window }
     [void]$window.ShowDialog()
     return $window

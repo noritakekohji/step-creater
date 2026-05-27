@@ -138,3 +138,21 @@ Describe 'Save and auto-save' {
         $script:win4.FindName('DirtyText').Text | Should -Be ''
     }
 }
+
+Describe 'ESC and close behavior' {
+    BeforeEach {
+        $script:tmp5 = Join-Path $TestDrive ("wf-close-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-StepCreaterWorkfolder -Path $script:tmp5 -Title 'Close Test' | Out-Null
+        $script:session5 = Open-StepCreaterWorkfolder -Path $script:tmp5
+        $script:win5 = Show-StepCreaterMainWindow -Session $script:session5 -NoShow
+    }
+
+    It 'exposes ConfirmDiscard on the window tag' {
+        $script:win5.Tag.ConfirmDiscard | Should -Not -BeNullOrEmpty
+    }
+
+    It 'ConfirmDiscard returns true when nothing is dirty (no prompt needed)' {
+        $result = & $script:win5.Tag.ConfirmDiscard
+        $result | Should -BeTrue
+    }
+}
