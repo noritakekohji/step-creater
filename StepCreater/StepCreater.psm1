@@ -982,3 +982,87 @@ function Add-CaptureAnnotation {
     }
     return $out
 }
+
+function Invoke-RectSelectionCapture {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)] [string]$OutputPath)
+
+    Add-Type -AssemblyName PresentationFramework
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $xamlPath = Join-Path $PSScriptRoot 'ui/RectSelector.xaml'
+    $xml = [xml](Get-Content -LiteralPath $xamlPath -Raw)
+    $reader = [System.Xml.XmlNodeReader]::new($xml)
+    $win = [Windows.Markup.XamlReader]::Load($reader)
+
+    $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+    $win.Left   = $bounds.Left
+    $win.Top    = $bounds.Top
+    $win.Width  = $bounds.Width
+    $win.Height = $bounds.Height
+
+    $rect = $win.FindName('SelRect')
+
+    $state = [pscustomobject]@{ Down = $false; StartX = 0; StartY = 0; Cancelled = $false }
+
+    $win.Add_MouseLeftButtonDown({
+        $p = $_.GetPosition($win)
+        $state.Down = $true
+        $state.StartX = $p.X; $state.StartY = $p.Y
+        [System.Windows.Controls.Canvas]::SetLeft($rect, $p.X)
+        [System.Windows.Controls.Canvas]::SetTop($rect, $p.Y)
+        $rect.Width = 0; $rect.Height = 0
+        $rect.Visibility = 'Visible'
+    }.GetNewClosure())
+
+    $win.Add_MouseMove({
+        if (-not $state.Down) { return }
+        $p = $_.GetPosition($win)
+        $x = [Math]::Min($state.StartX, $p.X); $y = [Math]::Min($state.StartY, $p.Y)
+        [System.Windows.Controls.Canvas]::SetLeft($rect, $x)
+        [System.Windows.Controls.Canvas]::SetTop($rect, $y)
+        $rect.Width  = [Math]::Abs($p.X - $state.StartX)
+        $rect.Height = [Math]::Abs($p.Y - $state.StartY)
+    }.GetNewClosure())
+
+    $win.Add_MouseLeftButtonUp({
+        if (-not $state.Down) { return }
+        $state.Down = $false
+        $win.Close()
+    }.GetNewClosure())
+
+    $win.Add_KeyDown({
+        if ($_.Key -eq [System.Windows.Input.Key]::Escape) {
+            $state.Cancelled = $true
+            $win.Close()
+        }
+    }.GetNewClosure())
+
+    [void]$win.ShowDialog()
+
+    if ($state.Cancelled -or $rect.Width -lt 4 -or $rect.Height -lt 4) {
+        return $null
+    }
+
+    $x = [int]([System.Windows.Controls.Canvas]::GetLeft($rect)) + $bounds.Left
+    $y = [int]([System.Windows.Controls.Canvas]::GetTop($rect))  + $bounds.Top
+    $w = [int]$rect.Width
+    $h = [int]$rect.Height
+
+    $bitmap = New-Object System.Drawing.Bitmap $w, $h
+    $g = [System.Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $g.CopyFromScreen(
+            (New-Object System.Drawing.Point $x, $y),
+            [System.Drawing.Point]::Empty,
+            (New-Object System.Drawing.Size $w, $h)
+        )
+    } finally { $g.Dispose() }
+    $dir = Split-Path -Parent $OutputPath
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $bitmap.Dispose()
+    return $OutputPath
+}
