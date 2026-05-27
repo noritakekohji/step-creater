@@ -790,3 +790,47 @@ function Invoke-FullScreenCapture {
     $bitmap.Dispose()
     return $OutputPath
 }
+
+function Invoke-ActiveWindowCapture {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)] [string]$OutputPath)
+
+    Initialize-StepCreaterWin32
+    Add-Type -AssemblyName System.Drawing
+
+    $hwnd = [StepCreater.Win32]::GetForegroundWindow()
+    if ($hwnd -eq [IntPtr]::Zero) { throw 'No foreground window.' }
+
+    $rect = New-Object StepCreater.Win32+RECT
+    $rectSize = [System.Runtime.InteropServices.Marshal]::SizeOf([type]([StepCreater.Win32+RECT]))
+    $hr = [StepCreater.Win32]::DwmGetWindowAttribute(
+        $hwnd,
+        [StepCreater.Win32]::DWMWA_EXTENDED_FRAME_BOUNDS,
+        [ref]$rect,
+        $rectSize
+    )
+    if ($hr -ne 0) {
+        [StepCreater.Win32]::GetWindowRect($hwnd, [ref]$rect) | Out-Null
+    }
+
+    $w = $rect.Width; $h = $rect.Height
+    if ($w -le 0 -or $h -le 0) { throw "Invalid window rect ($w x $h)." }
+
+    $bitmap = New-Object System.Drawing.Bitmap $w, $h
+    $g = [System.Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $g.CopyFromScreen(
+            (New-Object System.Drawing.Point $rect.Left, $rect.Top),
+            [System.Drawing.Point]::Empty,
+            (New-Object System.Drawing.Size $w, $h)
+        )
+    } finally {
+        $g.Dispose()
+    }
+    $dir = Split-Path -Parent $OutputPath
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $bitmap.Dispose()
+    return $OutputPath
+}

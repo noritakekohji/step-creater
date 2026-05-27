@@ -24,7 +24,8 @@
         'Save-WorkSession',
         'Initialize-StepCreaterWin32',
         'Get-CaptureFileName',
-        'Invoke-FullScreenCapture'
+        'Invoke-FullScreenCapture',
+        'Invoke-ActiveWindowCapture'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
