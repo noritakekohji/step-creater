@@ -37,6 +37,7 @@ if ($Init) {
 
 if (-not $WorkFolder) {
     Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName PresentationFramework
     $dlg = [System.Windows.Forms.FolderBrowserDialog]::new()
     $dlg.Description = 'ワークフォルダを選択（キャンセルで終了）'
     if ($dlg.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
@@ -46,6 +47,46 @@ if (-not $WorkFolder) {
     $WorkFolder = $dlg.SelectedPath
 }
 
-$session = Open-StepCreaterWorkfolder -Path $WorkFolder
-$session.Mode = $Mode
-Show-StepCreaterMainWindow -Session $session
+try {
+    Add-Type -AssemblyName PresentationFramework
+
+    $mdPath = Join-Path $WorkFolder 'procedure.md'
+    if (-not (Test-Path -LiteralPath $mdPath)) {
+        # 既存ワークフォルダではない → 新規作成するか確認
+        $existing = if (Test-Path -LiteralPath $WorkFolder) {
+            Get-ChildItem -LiteralPath $WorkFolder -Force | Select-Object -First 1
+        } else { $null }
+
+        $msg = if ($existing) {
+            "選択されたフォルダはStepCreaterのワークフォルダではありません:`n$WorkFolder`n`n新規ワークフォルダとして作成しますか？`n（既存ファイルは残りますが、procedure.md が新規生成されます）"
+        } else {
+            "選択されたフォルダは空です:`n$WorkFolder`n`n新規ワークフォルダとして作成しますか？"
+        }
+        $r = [System.Windows.MessageBox]::Show($msg, 'StepCreater', 'YesNo', 'Question')
+        if ($r -ne 'Yes') {
+            Write-Host '中止しました。'
+            return
+        }
+
+        Add-Type -AssemblyName Microsoft.VisualBasic
+        $title = [Microsoft.VisualBasic.Interaction]::InputBox(
+            '手順書のタイトルを入力してください', '新規ワークフォルダ', '新規手順書')
+        if ([string]::IsNullOrWhiteSpace($title)) {
+            Write-Host 'タイトル未入力のため中止しました。'
+            return
+        }
+
+        New-StepCreaterWorkfolder -Path $WorkFolder -Title $title -Force | Out-Null
+    }
+
+    $session = Open-StepCreaterWorkfolder -Path $WorkFolder
+    $session.Mode = $Mode
+    Show-StepCreaterMainWindow -Session $session
+}
+catch {
+    Add-Type -AssemblyName PresentationFramework
+    [System.Windows.MessageBox]::Show(
+        "起動に失敗しました:`n`n$($_.Exception.Message)`n`n$($_.ScriptStackTrace)",
+        'StepCreater - エラー', 'OK', 'Error') | Out-Null
+    Write-Error $_
+}
