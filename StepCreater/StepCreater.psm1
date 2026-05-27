@@ -436,7 +436,7 @@ function Show-StepCreaterMainWindow {
 
     $c = @{}
     foreach ($name in @(
-        'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates',
+        'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates','MenuSettings',
         'StatusText','DirtyText',
         'TabEdit','TabExecute','TabCapture',
         'WorkfolderPath','BtnSave',
@@ -799,31 +799,49 @@ function Show-StepCreaterMainWindow {
         }
     }.GetNewClosure())
 
+    $captureHandler = {
+        param($kind)
+        try {
+            $stepId = ''
+            if ($Session.Mode -eq 'Execute' -and $c.ExecChecklist.SelectedIndex -ge 0) {
+                $stepId = $Session.Procedure.Steps[$c.ExecChecklist.SelectedIndex].Id
+            }
+            Save-StepCreaterCapture -Session $Session -Kind $kind -StepId $stepId | Out-Null
+            if ($Session.Mode -eq 'Execute') {
+                Update-ExecChecklistUI -Session $Session -ListBox $c.ExecChecklist -ProgressLabel $c.ProgressLabel
+                & $loadExecStep $c.ExecChecklist.SelectedIndex
+            } else {
+                Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
+            }
+            Save-WorkSession -Session $Session
+            $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+            Update-DirtyIndicator -Window $window
+            $c.StatusText.Text = "キャプチャ保存 ($(Get-Date -Format HH:mm:ss))"
+        } catch {
+            $c.StatusText.Text = "キャプチャ失敗: $($_.Exception.Message)"
+        }
+    }.GetNewClosure()
+
+    $c.MenuSettings.Add_Click({
+        if (-not (Show-SettingsDialog -Owner $window)) { return }
+
+        if ($window.Tag.PSObject.Properties['HotkeyHandle'] -and $window.Tag.HotkeyHandle) {
+            Unregister-StepCreaterHotkeys -Handle $window.Tag.HotkeyHandle
+            $cfg2 = Get-StepCreaterConfig
+            $hk = Register-StepCreaterHotkeys -Window $window -Combos @{
+                full   = $cfg2.hotkeys.fullScreen
+                window = $cfg2.hotkeys.window
+                rect   = $cfg2.hotkeys.rect
+            } -OnFull   { & $captureHandler 'full'   } `
+               -OnWindow { & $captureHandler 'window' } `
+               -OnRect   { & $captureHandler 'rect'   }
+            $window.Tag.HotkeyHandle = $hk
+        }
+        $c.StatusText.Text = "設定を更新しました ($(Get-Date -Format HH:mm:ss))"
+    }.GetNewClosure())
+
     $window.Add_Loaded({
         $cfg = Get-StepCreaterConfig
-        $captureHandler = {
-            param($kind)
-            try {
-                $stepId = ''
-                if ($Session.Mode -eq 'Execute' -and $c.ExecChecklist.SelectedIndex -ge 0) {
-                    $stepId = $Session.Procedure.Steps[$c.ExecChecklist.SelectedIndex].Id
-                }
-                Save-StepCreaterCapture -Session $Session -Kind $kind -StepId $stepId | Out-Null
-                if ($Session.Mode -eq 'Execute') {
-                    Update-ExecChecklistUI -Session $Session -ListBox $c.ExecChecklist -ProgressLabel $c.ProgressLabel
-                    & $loadExecStep $c.ExecChecklist.SelectedIndex
-                } else {
-                    Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
-                }
-                Save-WorkSession -Session $Session
-                $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
-                Update-DirtyIndicator -Window $window
-                $c.StatusText.Text = "キャプチャ保存 ($(Get-Date -Format HH:mm:ss))"
-            } catch {
-                $c.StatusText.Text = "キャプチャ失敗: $($_.Exception.Message)"
-            }
-        }.GetNewClosure()
-
         $hk = Register-StepCreaterHotkeys -Window $window -Combos @{
             full   = $cfg.hotkeys.fullScreen
             window = $cfg.hotkeys.window
@@ -1650,4 +1668,58 @@ pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Conso
     [void]$sb.AppendLine('</body></html>')
 
     return $sb.ToString()
+}
+
+function Show-SettingsDialog {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param([Parameter()] $Owner)
+
+    Add-Type -AssemblyName PresentationFramework
+
+    $xamlPath = Join-Path $PSScriptRoot 'ui/SettingsDialog.xaml'
+    $xml = [xml](Get-Content -LiteralPath $xamlPath -Raw)
+    $reader = [System.Xml.XmlNodeReader]::new($xml)
+    $win = [Windows.Markup.XamlReader]::Load($reader)
+    if ($Owner) { $win.Owner = $Owner }
+
+    $cfg = Get-StepCreaterConfig
+    $txtFull   = $win.FindName('TxtHkFull')
+    $txtWindow = $win.FindName('TxtHkWindow')
+    $txtRect   = $win.FindName('TxtHkRect')
+    $chkAnnot  = $win.FindName('ChkAnnotation')
+
+    $txtFull.Text   = $cfg.hotkeys.fullScreen
+    $txtWindow.Text = $cfg.hotkeys.window
+    $txtRect.Text   = $cfg.hotkeys.rect
+    $chkAnnot.IsChecked = [bool]$cfg.annotationEnabled
+
+    $saved = [pscustomobject]@{ Ok = $false }
+
+    $win.FindName('BtnOk').Add_Click({
+        try {
+            ConvertTo-HotkeySpec -Combo $txtFull.Text   | Out-Null
+            ConvertTo-HotkeySpec -Combo $txtWindow.Text | Out-Null
+            ConvertTo-HotkeySpec -Combo $txtRect.Text   | Out-Null
+        } catch {
+            [System.Windows.MessageBox]::Show("ホットキーの書式が不正です: $($_.Exception.Message)",
+                'エラー', 'OK', 'Error') | Out-Null
+            return
+        }
+        $cfg.hotkeys.fullScreen = $txtFull.Text
+        $cfg.hotkeys.window     = $txtWindow.Text
+        $cfg.hotkeys.rect       = $txtRect.Text
+        $cfg.annotationEnabled  = [bool]$chkAnnot.IsChecked
+        Set-StepCreaterConfig -Config $cfg
+        $saved.Ok = $true
+        $win.Close()
+    }.GetNewClosure())
+
+    $win.FindName('BtnCancel').Add_Click({ $win.Close() }.GetNewClosure())
+    $win.Add_KeyDown({
+        if ($_.Key -eq [System.Windows.Input.Key]::Escape) { $win.Close() }
+    }.GetNewClosure())
+
+    [void]$win.ShowDialog()
+    return $saved.Ok
 }

@@ -24,7 +24,7 @@
         $window = [Windows.Markup.XamlReader]::Load($reader)
 
         foreach ($name in @(
-            'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates',
+            'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates','MenuSettings',
             'StatusText','DirtyText',
             'TabEdit','TabExecute','TabCapture',
             'WorkfolderPath','BtnSave',

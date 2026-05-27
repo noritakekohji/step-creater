@@ -39,7 +39,8 @@
         'Add-BlackoutRect',
         'Show-MaskEditor',
         'Get-StepDuration',
-        'ConvertTo-ProcedureHtml'
+        'ConvertTo-ProcedureHtml',
+        'Show-SettingsDialog'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
