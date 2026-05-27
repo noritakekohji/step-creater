@@ -626,15 +626,29 @@ function Show-StepCreaterMainWindow {
         foreach ($ev in $step.Evidence) {
             $path = Join-Path $Session.WorkFolderPath ("images/" + $ev.FileName)
             if (-not (Test-Path -LiteralPath $path)) { continue }
+
+            $btn = New-Object System.Windows.Controls.Button
+            $btn.Width = 110; $btn.Height = 78; $btn.Margin = '2'; $btn.Padding = 0
+            $btn.ToolTip = $ev.FileName + ' (ダブルクリックでマスク編集)'
+
             $img = New-Object System.Windows.Controls.Image
             $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
             $bmp.BeginInit(); $bmp.CacheOption = 'OnLoad'
             $bmp.UriSource = (New-Object System.Uri $path)
             $bmp.DecodePixelWidth = 200
             $bmp.EndInit()
-            $img.Source = $bmp; $img.Stretch = 'Uniform'; $img.Width = 100; $img.Height = 70; $img.Margin = '2'
-            $img.ToolTip = $ev.FileName
-            $c.ExecEvidenceTray.Children.Add($img) | Out-Null
+            $img.Source = $bmp; $img.Stretch = 'Uniform'
+            $btn.Content = $img
+
+            $evLocal = $ev
+            $sessionLocal = $Session
+            $btn.add_MouseDoubleClick({
+                $imgPath = Join-Path $sessionLocal.WorkFolderPath ("images/" + $evLocal.FileName)
+                [void](Show-MaskEditor -ImagePath $imgPath)
+                & $loadExecStep $c.ExecChecklist.SelectedIndex
+            }.GetNewClosure())
+
+            $c.ExecEvidenceTray.Children.Add($btn) | Out-Null
         }
     }.GetNewClosure()
 
@@ -1320,6 +1334,11 @@ function Update-UnassignedTrayUI {
 
         $refLocal = $ref
         $btn.Add_Click({ & $OnAssign $refLocal }.GetNewClosure())
+        $sessionLocal = $Session
+        $btn.add_MouseDoubleClick({
+            $path = Join-Path $sessionLocal.WorkFolderPath ("images/" + $refLocal.FileName)
+            [void](Show-MaskEditor -ImagePath $path)
+        }.GetNewClosure())
         $TrayPanel.Children.Add($btn) | Out-Null
     }
 }
