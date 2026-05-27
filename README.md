@@ -55,3 +55,14 @@ Invoke-Build -File StepCreater/StepCreater.build.ps1 All
 # 既存ワークフォルダを開く
 .\StepCreater\StepCreater.ps1 -WorkFolder C:\temp\proc1
 ```
+
+## インストール / アンインストール
+
+エンドユーザー向けの per-user インストーラ（管理者権限不要）：
+
+```
+install.bat       -- %LOCALAPPDATA%\Programs\StepCreater にコピー＋スタートメニュー登録
+uninstall.bat     -- 上記をアンインストール（config は任意削除）
+```
+
+ワークフォルダ（手順書本体）はインストール／アンインストールの影響を受けません。
