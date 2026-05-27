@@ -29,7 +29,8 @@
             'TabEdit','TabExecute','TabCapture',
             'WorkfolderPath','BtnSave',
             'StepList','BtnAdd','BtnDelete','BtnUp','BtnDown',
-            'TxtTitle','CboStatus','TxtBody','TxtCommand','TxtExpected','TxtNote'
+            'TxtTitle','CboStatus','TxtBody','TxtCommand','TxtExpected','TxtNote',
+            'UnassignedTray'
         )) {
             $window.FindName($name) | Should -Not -BeNullOrEmpty -Because "$name should exist in XAML"
         }

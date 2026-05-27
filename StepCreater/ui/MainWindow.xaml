@@ -21,6 +21,17 @@
             <StatusBarItem><TextBlock x:Name="DirtyText" Text=""/></StatusBarItem>
         </StatusBar>
 
+        <Border DockPanel.Dock="Bottom" BorderBrush="LightGray" BorderThickness="0,1,0,0"
+                Background="#FAFAFA" Padding="6" Height="120">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="未割当スクリーンショット (クリックで現Stepに割当)"
+                           FontSize="11" Foreground="DimGray" Margin="0,0,0,4"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <WrapPanel x:Name="UnassignedTray" Orientation="Horizontal"/>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
         <Grid DockPanel.Dock="Top" Margin="8,4,8,4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>

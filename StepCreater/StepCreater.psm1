@@ -441,7 +441,8 @@ function Show-StepCreaterMainWindow {
         'TabEdit','TabExecute','TabCapture',
         'WorkfolderPath','BtnSave',
         'StepList','BtnAdd','BtnDelete','BtnUp','BtnDown',
-        'TxtTitle','CboStatus','TxtBody','TxtCommand','TxtExpected','TxtNote'
+        'TxtTitle','CboStatus','TxtBody','TxtCommand','TxtExpected','TxtNote',
+        'UnassignedTray'
     )) { $c[$name] = $window.FindName($name) }
 
     $c.WorkfolderPath.Text = $Session.WorkFolderPath
@@ -583,6 +584,22 @@ function Show-StepCreaterMainWindow {
         Controls = $c
         Baseline = (Get-ProcedureHash -Procedure $Session.Procedure)
     }
+
+    $assignToCurrent = {
+        param($ref)
+        $idx = $c.StepList.SelectedIndex
+        if ($idx -lt 0) {
+            [System.Windows.MessageBox]::Show('割当先のStepを先に選択してください。', '情報', 'OK', 'Information') | Out-Null
+            return
+        }
+        $Session.UnassignedScreenshots.Remove($ref) | Out-Null
+        $Session.Procedure.Steps[$idx].Evidence.Add($ref) | Out-Null
+        Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+        Update-DirtyIndicator -Window $window
+    }.GetNewClosure()
+    Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
 
     $confirmDiscard = {
         $current = Get-ProcedureHash -Procedure $Session.Procedure
@@ -1133,4 +1150,42 @@ function Save-StepCreaterCapture {
         }
     }
     return $ref
+}
+
+function Update-UnassignedTrayUI {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [WorkSession]$Session,
+        [Parameter(Mandatory)] $TrayPanel,
+        [Parameter(Mandatory)] [scriptblock]$OnAssign
+    )
+    Add-Type -AssemblyName PresentationFramework
+
+    # $OnAssign is referenced inside closures below; touch here to satisfy PSReviewUnusedParameter
+    $null = $OnAssign
+
+    $TrayPanel.Children.Clear()
+    foreach ($ref in $Session.UnassignedScreenshots) {
+        $path = Join-Path $Session.WorkFolderPath ("images/" + $ref.FileName)
+        if (-not (Test-Path -LiteralPath $path)) { continue }
+
+        $btn = New-Object System.Windows.Controls.Button
+        $btn.Width = 120; $btn.Height = 80; $btn.Margin = '4'
+        $btn.ToolTip = $ref.FileName
+
+        $img = New-Object System.Windows.Controls.Image
+        $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
+        $bmp.BeginInit()
+        $bmp.CacheOption = 'OnLoad'
+        $bmp.UriSource = (New-Object System.Uri $path)
+        $bmp.DecodePixelWidth = 240
+        $bmp.EndInit()
+        $img.Source = $bmp
+        $img.Stretch = 'Uniform'
+        $btn.Content = $img
+
+        $refLocal = $ref
+        $btn.Add_Click({ & $OnAssign $refLocal }.GetNewClosure())
+        $TrayPanel.Children.Add($btn) | Out-Null
+    }
 }

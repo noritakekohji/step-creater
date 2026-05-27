@@ -31,7 +31,8 @@
         'Unregister-StepCreaterHotkeys',
         'Add-CaptureAnnotation',
         'Invoke-RectSelectionCapture',
-        'Save-StepCreaterCapture'
+        'Save-StepCreaterCapture',
+        'Update-UnassignedTrayUI'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
