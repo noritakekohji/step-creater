@@ -33,6 +33,7 @@
         'Invoke-RectSelectionCapture',
         'Save-StepCreaterCapture',
         'Update-UnassignedTrayUI',
+        'Update-EditEvidenceTray',
         'Get-ProgressLabel',
         'Update-ExecChecklistUI',
         'Set-StepStatus',

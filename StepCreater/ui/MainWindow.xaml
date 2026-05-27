@@ -73,6 +73,7 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0" Margin="0,0,0,8">
@@ -113,9 +114,20 @@
                         </GroupBox>
                     </Grid>
 
-                    <GroupBox Grid.Row="3" Header="備考" Margin="0,4,0,0" Height="80">
+                    <GroupBox Grid.Row="3" Header="備考" Margin="0,4,0,0" Height="60">
                         <TextBox x:Name="TxtNote" AcceptsReturn="True" TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto"/>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="4" Header="エビデンス画像" Margin="0,4,0,0" Height="120">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" x:Name="BtnAddEvidence"
+                                    Content="+ 画像追加" Padding="8,4" Margin="4,4,4,4"
+                                    VerticalAlignment="Top"/>
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <WrapPanel x:Name="EditEvidenceTray" Orientation="Horizontal"/>
+                            </ScrollViewer>
+                        </DockPanel>
                     </GroupBox>
                 </Grid>
             </Grid>
