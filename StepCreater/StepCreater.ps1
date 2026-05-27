@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   StepCreater entry point. Phase 1: CLI for workfolder operations (no GUI yet).
 .PARAMETER WorkFolder
@@ -36,18 +36,16 @@ if ($Init) {
 }
 
 if (-not $WorkFolder) {
-    Write-Host 'Usage: StepCreater.ps1 -WorkFolder <path> [-Mode Edit|Execute|Capture]'
-    Write-Host '       StepCreater.ps1 -Init -WorkFolder <path> -Title "<title>"'
-    return
+    Add-Type -AssemblyName System.Windows.Forms
+    $dlg = [System.Windows.Forms.FolderBrowserDialog]::new()
+    $dlg.Description = 'ワークフォルダを選択（キャンセルで終了）'
+    if ($dlg.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+        Write-Host 'キャンセルされました。'
+        return
+    }
+    $WorkFolder = $dlg.SelectedPath
 }
 
 $session = Open-StepCreaterWorkfolder -Path $WorkFolder
 $session.Mode = $Mode
-
-Write-Host "Opened: $($session.WorkFolderPath)"
-Write-Host "Title : $($session.Procedure.Title)"
-Write-Host "Steps : $($session.Procedure.Steps.Count)"
-Write-Host "Mode  : $($session.Mode)"
-foreach ($step in $session.Procedure.Steps) {
-    Write-Host ("  [{0}] {1}: {2}" -f $step.Status, $step.Id, $step.Title)
-}
+Show-StepCreaterMainWindow -Session $session
