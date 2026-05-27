@@ -753,3 +753,17 @@ namespace StepCreater {
 
     Add-Type -TypeDefinition $signature -ReferencedAssemblies System.Windows.Forms
 }
+
+function Get-CaptureFileName {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [ValidateSet('full','window','rect')] [string]$Kind,
+        [Parameter(Mandatory)] [AllowEmptyString()] [string]$StepId,
+        [Parameter()] [datetime]$Timestamp = (Get-Date)
+    )
+    $stamp  = $Timestamp.ToString('yyyy-MM-dd_HHmmss')
+    $suffix = if ([string]::IsNullOrEmpty($StepId)) { 'unassigned' } else { 'step' + $StepId }
+    $kindTag = switch ($Kind) { 'full' { '' } 'window' { '_win' } 'rect' { '_rect' } }
+    return "${stamp}_${suffix}${kindTag}.png"
+}
