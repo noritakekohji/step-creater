@@ -600,7 +600,12 @@ function Show-StepCreaterMainWindow {
         Baseline = (Get-ProcedureHash -Procedure $Session.Procedure)
     }
 
-    $assignToCurrent = {
+    # Use a hashtable wrapper so the closure can reference its own scriptblock
+    # for recursion via mutable reference. GetNewClosure() captures variables
+    # at call-time, so a self-referencing scriptblock variable would otherwise
+    # capture $null (since the assignment has not completed yet).
+    $assignBox = @{}
+    $assignBox.Fn = {
         param($ref)
         $idx = $c.StepList.SelectedIndex
         if ($idx -lt 0) {
@@ -609,11 +614,12 @@ function Show-StepCreaterMainWindow {
         }
         $Session.UnassignedScreenshots.Remove($ref) | Out-Null
         $Session.Procedure.Steps[$idx].Evidence.Add($ref) | Out-Null
-        Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
+        Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignBox.Fn
         Save-WorkSession -Session $Session
         $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
         Update-DirtyIndicator -Window $window
     }.GetNewClosure()
+    $assignToCurrent = $assignBox.Fn
     Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
 
     # ---- Execute mode helpers ----
@@ -1347,12 +1353,12 @@ function Update-UnassignedTrayUI {
     param(
         [Parameter(Mandatory)] [WorkSession]$Session,
         [Parameter(Mandatory)] $TrayPanel,
-        [Parameter(Mandatory)] [scriptblock]$OnAssign
+        [Parameter()] [scriptblock]$OnAssign = $null
     )
     Add-Type -AssemblyName PresentationFramework
 
-    # $OnAssign is referenced inside closures below; touch here to satisfy PSReviewUnusedParameter
-    $null = $OnAssign
+    # If no callback supplied, install a no-op so click doesn't error.
+    if ($null -eq $OnAssign) { $OnAssign = { param($r); $null = $r } }
 
     $TrayPanel.Children.Clear()
     foreach ($ref in $Session.UnassignedScreenshots) {
