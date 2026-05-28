@@ -68,6 +68,15 @@ class ProcedureDoc {
     }
 }
 
+function Get-ImageBareName {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$FileName)
+    if ([string]::IsNullOrEmpty($FileName)) { return '' }
+    # Split-Path -Leaf strips any directory prefix (images/, img\, etc.)
+    return (Split-Path -Path ($FileName -replace '/', '\') -Leaf)
+}
+
 function Write-Procedure {
     [CmdletBinding()]
     [OutputType([string])]
@@ -110,7 +119,7 @@ function Write-Procedure {
         if ($step.ProcedureImages.Count -gt 0) {
             [void]$sb.Append("### 手順画像$nl")
             foreach ($pi in $step.ProcedureImages) {
-                [void]$sb.Append("![]($($pi.FileName))$nl")
+                [void]$sb.Append("![](images/$(Get-ImageBareName $pi.FileName))$nl")
             }
             [void]$sb.Append($nl)
         }
@@ -131,7 +140,7 @@ function Write-Procedure {
         if ($step.Evidence.Count -gt 0) {
             [void]$sb.Append("### エビデンス$nl")
             foreach ($ev in $step.Evidence) {
-                [void]$sb.Append("![]($($ev.FileName))$nl")
+                [void]$sb.Append("![](images/$(Get-ImageBareName $ev.FileName))$nl")
             }
             [void]$sb.Append($nl)
         }
@@ -221,14 +230,14 @@ function Read-Procedure {
                 '### 手順画像'   {
                     foreach ($m in [regex]::Matches($content, '!\[[^\]]*\]\(([^)]+)\)')) {
                         $step.ProcedureImages.Add(
-                            [ScreenshotRef]::new($m.Groups[1].Value, [datetime]::MinValue, 'full')
+                            [ScreenshotRef]::new((Get-ImageBareName $m.Groups[1].Value), [datetime]::MinValue, 'full')
                         ) | Out-Null
                     }
                 }
                 '### エビデンス'   {
                     foreach ($m in [regex]::Matches($content, '!\[[^\]]*\]\(([^)]+)\)')) {
                         $step.Evidence.Add(
-                            [ScreenshotRef]::new($m.Groups[1].Value, [datetime]::MinValue, 'full')
+                            [ScreenshotRef]::new((Get-ImageBareName $m.Groups[1].Value), [datetime]::MinValue, 'full')
                         ) | Out-Null
                     }
                 }
@@ -1488,7 +1497,7 @@ function Update-UnassignedTrayUI {
 
     $TrayPanel.Children.Clear()
     foreach ($ref in $Session.UnassignedScreenshots) {
-        $path = Join-Path $Session.WorkFolderPath ("images/" + $ref.FileName)
+        $path = Join-Path $Session.WorkFolderPath ("images\" + (Get-ImageBareName $ref.FileName))
         if (-not (Test-Path -LiteralPath $path)) { continue }
 
         $btn = New-Object System.Windows.Controls.Button
@@ -1516,7 +1525,7 @@ function Update-UnassignedTrayUI {
         $btn.Add_Click({ & $OnSelect $refLocal }.GetNewClosure())
         $sessionLocal = $Session
         $btn.add_MouseDoubleClick({
-            $p = Join-Path $sessionLocal.WorkFolderPath ("images/" + $refLocal.FileName)
+            $p = Join-Path $sessionLocal.WorkFolderPath ("images\" + (Get-ImageBareName $refLocal.FileName))
             [void](Show-MaskEditor -ImagePath $p)
         }.GetNewClosure())
         $TrayPanel.Children.Add($btn) | Out-Null
@@ -1542,7 +1551,7 @@ function Update-StepImageTray {
     $list = if ($Kind -eq 'procedure') { $step.ProcedureImages } else { $step.Evidence }
 
     foreach ($img in $list) {
-        $path = Join-Path $Session.WorkFolderPath ("images/" + $img.FileName)
+        $path = Join-Path $Session.WorkFolderPath ("images\" + (Get-ImageBareName $img.FileName))
         if (-not (Test-Path -LiteralPath $path)) { continue }
 
         $cell = New-Object System.Windows.Controls.Grid
@@ -1563,7 +1572,7 @@ function Update-StepImageTray {
         $imgLocal = $img
         $sessionLocal = $Session
         $btn.add_MouseDoubleClick({
-            $p = Join-Path $sessionLocal.WorkFolderPath ("images/" + $imgLocal.FileName)
+            $p = Join-Path $sessionLocal.WorkFolderPath ("images\" + (Get-ImageBareName $imgLocal.FileName))
             [void](Show-MaskEditor -ImagePath $p)
         }.GetNewClosure())
         $cell.Children.Add($btn) | Out-Null
@@ -1859,7 +1868,7 @@ pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Conso
         if ($step.ProcedureImages.Count -gt 0) {
             [void]$sb.AppendLine('<div class="section procedure-images"><h3>手順画像</h3><div>')
             foreach ($pi in $step.ProcedureImages) {
-                $src = & $esc $pi.FileName
+                $src = & $esc ("images/" + (Get-ImageBareName $pi.FileName))
                 [void]$sb.AppendLine("<img src=`"$src`" alt=`"$src`" onclick=`"sc_lb(this.src)`">")
             }
             [void]$sb.AppendLine('</div></div>')
@@ -1873,7 +1882,7 @@ pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Conso
         if ($step.Evidence.Count -gt 0) {
             [void]$sb.AppendLine('<div class="section evidence"><h3>エビデンス</h3><div>')
             foreach ($ev in $step.Evidence) {
-                $src = & $esc $ev.FileName
+                $src = & $esc ("images/" + (Get-ImageBareName $ev.FileName))
                 [void]$sb.AppendLine("<img src=`"$src`" alt=`"$src`" onclick=`"sc_lb(this.src)`">")
             }
             [void]$sb.AppendLine('</div></div>')

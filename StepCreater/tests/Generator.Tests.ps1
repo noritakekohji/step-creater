@@ -45,7 +45,7 @@ Describe 'Write-Procedure (generator)' {
         $md | Should -Match '### 想定結果'
         $md | Should -Match 'Exit code 0'
         $md | Should -Match '### エビデンス'
-        $md | Should -Match '!\[\]\(img/a\.png\)'
+        $md | Should -Match '!\[\]\(images/a\.png\)'
         $md | Should -Match '### 備考'
         $md | Should -Match 'Reboot may be required'
     }
@@ -77,5 +77,13 @@ Describe 'Write-Procedure (generator)' {
         $md = Write-Procedure -Procedure $doc
         $md | Should -Match '### 手順画像'
         $md | Should -Match '!\[\]\(images/proc1\.png\)'
+    }
+
+    It 'prepends images/ to a BARE evidence filename in markdown (regression)' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('A')
+        $s.Evidence.Add([ScreenshotRef]::new('cap1.png', (Get-Date), 'full')) | Out-Null
+        $md = Write-Procedure -Procedure $doc
+        $md | Should -Match '!\[\]\(images/cap1\.png\)'
     }
 }

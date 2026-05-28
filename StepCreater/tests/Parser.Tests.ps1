@@ -39,8 +39,8 @@ Describe 'Read-Procedure (parser)' {
     It 'parses Step 1 evidence images' {
         $s1 = $script:doc.Steps[0]
         $s1.Evidence.Count       | Should -Be 2
-        $s1.Evidence[0].FileName | Should -Be 'images/2026-05-27_103045_step01.png'
-        $s1.Evidence[1].FileName | Should -Be 'images/2026-05-27_103120_step01_win.png'
+        $s1.Evidence[0].FileName | Should -Be '2026-05-27_103045_step01.png'
+        $s1.Evidence[1].FileName | Should -Be '2026-05-27_103120_step01_win.png'
     }
 
     It 'defaults missing meta to pending and null times for Step 2' {
@@ -82,8 +82,8 @@ title: PI Test
         $doc = Read-Procedure -Path $tmp.FullName
         Remove-Item $tmp.FullName -Force
         $doc.Steps[0].ProcedureImages.Count | Should -Be 2
-        $doc.Steps[0].ProcedureImages[0].FileName | Should -Be 'images/p1.png'
+        $doc.Steps[0].ProcedureImages[0].FileName | Should -Be 'p1.png'
         $doc.Steps[0].Evidence.Count | Should -Be 1
-        $doc.Steps[0].Evidence[0].FileName | Should -Be 'images/e1.png'
+        $doc.Steps[0].Evidence[0].FileName | Should -Be 'e1.png'
     }
 }

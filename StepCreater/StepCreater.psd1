@@ -6,6 +6,7 @@
     Description       = 'Procedure document & evidence capture tool for system construction work.'
     PowerShellVersion = '5.1'
     FunctionsToExport = @(
+        'Get-ImageBareName',
         'Read-Procedure',
         'Write-Procedure',
         'New-StepCreaterWorkfolder',

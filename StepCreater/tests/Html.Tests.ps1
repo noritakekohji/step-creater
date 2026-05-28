@@ -71,4 +71,13 @@ Describe 'ConvertTo-ProcedureHtml' {
         $html | Should -Match 'procedure-images'
         $html | Should -Match 'src="images/proc\.png"'
     }
+
+    It 'prepends images/ to a BARE evidence filename (regression)' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('A')
+        $s.Evidence.Add([ScreenshotRef]::new('2026-05-27_103045_step01.png', (Get-Date), 'full')) | Out-Null
+        $html = ConvertTo-ProcedureHtml -Procedure $doc
+        $html | Should -Match 'src="images/2026-05-27_103045_step01\.png"'
+        $html | Should -Not -Match 'src="2026-05-27_103045_step01\.png"'
+    }
 }
