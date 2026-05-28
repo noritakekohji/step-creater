@@ -15,6 +15,7 @@ Describe 'Markdown round-trip' {
         $a.Finished       = [datetime]'2026-05-27T10:05:00'
         $a.Note           = 'Reboot first.'
         $a.Evidence.Add([ScreenshotRef]::new('images/x.png', [datetime]'2026-05-27', 'full')) | Out-Null
+        $a.ProcedureImages.Add([ScreenshotRef]::new('images/proc.png', [datetime]'2026-05-27', 'full')) | Out-Null
 
         $b = $doc.AddStep('Configure')
         $b.BodyMarkdown   = 'Edit bindings.'
@@ -36,6 +37,8 @@ Describe 'Markdown round-trip' {
         $parsed.Steps[0].Finished        | Should -Be ([datetime]'2026-05-27T10:05:00')
         $parsed.Steps[0].Evidence.Count  | Should -Be 1
         $parsed.Steps[0].Evidence[0].FileName | Should -Be 'images/x.png'
+        $parsed.Steps[0].ProcedureImages.Count | Should -Be 1
+        $parsed.Steps[0].ProcedureImages[0].FileName | Should -Be 'images/proc.png'
 
         $parsed.Steps[1].UnknownSectionsRaw['### 参考リンク'] | Should -Match 'example.com'
 

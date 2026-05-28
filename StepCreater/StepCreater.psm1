@@ -29,6 +29,7 @@ class Step {
     [Nullable[datetime]] $Finished
     [string] $Note
     [System.Collections.Generic.List[ScreenshotRef]] $Evidence
+    [System.Collections.Generic.List[ScreenshotRef]] $ProcedureImages
     [hashtable] $UnknownSectionsRaw
 
     Step([string]$id, [string]$title) {
@@ -40,6 +41,7 @@ class Step {
         $this.Status              = 'pending'
         $this.Note                = ''
         $this.Evidence            = [System.Collections.Generic.List[ScreenshotRef]]::new()
+        $this.ProcedureImages     = [System.Collections.Generic.List[ScreenshotRef]]::new()
         $this.UnknownSectionsRaw  = @{}
     }
 }
@@ -103,6 +105,14 @@ function Write-Procedure {
             [void]$sb.Append("### 手順$nl")
             [void]$sb.Append($step.BodyMarkdown.TrimEnd())
             [void]$sb.Append("$nl$nl")
+        }
+
+        if ($step.ProcedureImages.Count -gt 0) {
+            [void]$sb.Append("### 手順画像$nl")
+            foreach ($pi in $step.ProcedureImages) {
+                [void]$sb.Append("![]($($pi.FileName))$nl")
+            }
+            [void]$sb.Append($nl)
         }
 
         if ($step.Command) {
@@ -208,6 +218,13 @@ function Read-Procedure {
                     else { $step.Command = $content }
                 }
                 '### 想定結果'     { $step.ExpectedResult = $content }
+                '### 手順画像'   {
+                    foreach ($m in [regex]::Matches($content, '!\[[^\]]*\]\(([^)]+)\)')) {
+                        $step.ProcedureImages.Add(
+                            [ScreenshotRef]::new($m.Groups[1].Value, [datetime]::MinValue, 'full')
+                        ) | Out-Null
+                    }
+                }
                 '### エビデンス'   {
                     foreach ($m in [regex]::Matches($content, '!\[[^\]]*\]\(([^)]+)\)')) {
                         $step.Evidence.Add(
@@ -1766,13 +1783,14 @@ h2 { margin-top: 32px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
 .section h3 { margin: 8px 0 4px; font-size: 1em; color: #555; }
 pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Consolas, monospace; overflow-x: auto; }
 .evidence img { max-width: 320px; max-height: 240px; margin: 6px; cursor: zoom-in; border: 1px solid #ddd; }
+.procedure-images img { max-width: 320px; max-height: 240px; margin: 6px; cursor: zoom-in; border: 1px solid #ddd; }
 .lightbox { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; cursor: zoom-out; }
 .lightbox.visible { display: flex; }
 .lightbox img { max-width: 95%; max-height: 95%; }
 @media print {
     .toc { page-break-after: always; }
     h2 { page-break-before: always; }
-    .evidence img { max-width: 100%; max-height: none; page-break-inside: avoid; }
+    .evidence img, .procedure-images img { max-width: 100%; max-height: none; page-break-inside: avoid; }
     .lightbox { display: none !important; }
 }
 '@)
@@ -1808,6 +1826,14 @@ pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Conso
 
         if ($step.BodyMarkdown) {
             [void]$sb.AppendLine('<div class="section"><h3>手順</h3><div>' + (& $esc $step.BodyMarkdown) + '</div></div>')
+        }
+        if ($step.ProcedureImages.Count -gt 0) {
+            [void]$sb.AppendLine('<div class="section procedure-images"><h3>手順画像</h3><div>')
+            foreach ($pi in $step.ProcedureImages) {
+                $src = & $esc $pi.FileName
+                [void]$sb.AppendLine("<img src=`"$src`" alt=`"$src`" onclick=`"sc_lb(this.src)`">")
+            }
+            [void]$sb.AppendLine('</div></div>')
         }
         if ($step.Command) {
             [void]$sb.AppendLine('<div class="section"><h3>実行コマンド</h3><pre>' + (& $esc $step.Command) + '</pre></div>')

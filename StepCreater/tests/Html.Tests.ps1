@@ -62,4 +62,13 @@ Describe 'ConvertTo-ProcedureHtml' {
         $html | Should -Match 'A &lt; B'
         $html | Should -Not -Match '<script>alert\(1\)</script>'
     }
+
+    It 'renders 手順画像 images' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('A')
+        $s.ProcedureImages.Add([ScreenshotRef]::new('images/proc.png', [datetime]'2026-05-27', 'full')) | Out-Null
+        $html = ConvertTo-ProcedureHtml -Procedure $doc
+        $html | Should -Match 'procedure-images'
+        $html | Should -Match 'src="images/proc\.png"'
+    }
 }

@@ -20,6 +20,7 @@ Describe 'Step' {
         $step.ExpectedResult  | Should -Be ''
         $step.Note            | Should -Be ''
         $step.Evidence.Count  | Should -Be 0
+        $step.ProcedureImages.Count | Should -Be 0
         $step.Started         | Should -BeNullOrEmpty
         $step.Finished        | Should -BeNullOrEmpty
     }

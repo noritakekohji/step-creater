@@ -56,3 +56,34 @@ Describe 'Read-Procedure (parser)' {
         $s2.UnknownSectionsRaw['### 参考リンク']             | Should -Match 'https://example\.com'
     }
 }
+
+Describe 'Read-Procedure 手順画像' {
+    It 'parses 手順画像 section into ProcedureImages' {
+        $md = @"
+---
+title: PI Test
+---
+
+# PI Test
+
+## Step 1: A
+<!-- step-id: 01 -->
+- status: pending
+
+### 手順画像
+![](images/p1.png)
+![](images/p2.png)
+
+### エビデンス
+![](images/e1.png)
+"@
+        $tmp = New-TemporaryFile
+        Set-Content -LiteralPath $tmp.FullName -Value $md -Encoding UTF8
+        $doc = Read-Procedure -Path $tmp.FullName
+        Remove-Item $tmp.FullName -Force
+        $doc.Steps[0].ProcedureImages.Count | Should -Be 2
+        $doc.Steps[0].ProcedureImages[0].FileName | Should -Be 'images/p1.png'
+        $doc.Steps[0].Evidence.Count | Should -Be 1
+        $doc.Steps[0].Evidence[0].FileName | Should -Be 'images/e1.png'
+    }
+}

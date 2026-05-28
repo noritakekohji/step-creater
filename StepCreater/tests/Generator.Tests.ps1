@@ -69,4 +69,13 @@ Describe 'Write-Procedure (generator)' {
         $md | Should -Match '### 参考リンク'
         $md | Should -Match 'https://example\.com'
     }
+
+    It 'emits 手順画像 section when ProcedureImages present' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('Step1')
+        $s.ProcedureImages.Add([ScreenshotRef]::new('images/proc1.png', [datetime]'2026-05-27', 'full')) | Out-Null
+        $md = Write-Procedure -Procedure $doc
+        $md | Should -Match '### 手順画像'
+        $md | Should -Match '!\[\]\(images/proc1\.png\)'
+    }
 }
