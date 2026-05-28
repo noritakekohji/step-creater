@@ -26,8 +26,13 @@
         <Border DockPanel.Dock="Bottom" BorderBrush="LightGray" BorderThickness="0,1,0,0"
                 Background="#FAFAFA" Padding="6" Height="120">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="未割当スクリーンショット (クリックで現Stepに割当)"
-                           FontSize="11" Foreground="DimGray" Margin="0,0,0,4"/>
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                    <Button DockPanel.Dock="Right" x:Name="BtnAddSelected"
+                            Content="選択画像を追加" Padding="10,2"/>
+                    <TextBlock x:Name="UnassignedLabel" VerticalAlignment="Center"
+                               Text="未割当スクリーンショット (クリックで選択 → 追加)"
+                               FontSize="11" Foreground="DimGray"/>
+                </DockPanel>
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                     <WrapPanel x:Name="UnassignedTray" Orientation="Horizontal"/>
                 </ScrollViewer>
@@ -119,10 +124,10 @@
                                  VerticalScrollBarVisibility="Auto"/>
                     </GroupBox>
 
-                    <GroupBox Grid.Row="4" Header="エビデンス画像" Margin="0,4,0,0" Height="120">
+                    <GroupBox Grid.Row="4" Header="手順画像" Margin="0,4,0,0" Height="120">
                         <DockPanel>
                             <Button DockPanel.Dock="Right" x:Name="BtnAddEvidence"
-                                    Content="+ 画像追加" Padding="8,4" Margin="4,4,4,4"
+                                    Content="+ 画像追加(ファイル)" Padding="8,4" Margin="4,4,4,4"
                                     VerticalAlignment="Top"/>
                             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                                 <WrapPanel x:Name="EditEvidenceTray" Orientation="Horizontal"/>
@@ -151,6 +156,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" x:Name="ExecStepTitle" FontSize="16" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -162,7 +168,13 @@
                         </ScrollViewer>
                     </GroupBox>
 
-                    <Grid Grid.Row="2" Margin="0,8,0,0">
+                    <GroupBox Grid.Row="2" Header="手順画像" Margin="0,8,0,0" Height="90">
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                            <WrapPanel x:Name="ExecProcImageTray" Orientation="Horizontal"/>
+                        </ScrollViewer>
+                    </GroupBox>
+
+                    <Grid Grid.Row="3" Margin="0,8,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -175,12 +187,12 @@
                                 Margin="8,0,0,0" Padding="12,4" VerticalAlignment="Bottom"/>
                     </Grid>
 
-                    <GroupBox Grid.Row="3" Header="想定結果" Margin="0,8,0,0">
+                    <GroupBox Grid.Row="4" Header="想定結果" Margin="0,8,0,0">
                         <TextBox x:Name="ExecExpected" IsReadOnly="True" TextWrapping="Wrap"
                                  BorderThickness="0" Background="White"/>
                     </GroupBox>
 
-                    <Grid Grid.Row="4" Margin="0,12,0,0">
+                    <Grid Grid.Row="5" Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>

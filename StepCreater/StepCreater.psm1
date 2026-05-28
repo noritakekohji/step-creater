@@ -464,7 +464,8 @@ function Show-StepCreaterMainWindow {
         'ProgressLabel','ExecChecklist',
         'ExecStepTitle','ExecBody','ExecCommand','BtnCopyCommand','ExecExpected',
         'ExecEvidenceTray','BtnComplete','BtnNg','BtnSkip',
-        'EditEvidenceTray','BtnAddEvidence'
+        'EditEvidenceTray','BtnAddEvidence',
+        'BtnAddSelected','UnassignedLabel','ExecProcImageTray'
     )) { $c[$name] = $window.FindName($name) }
 
     $c.WorkfolderPath.Text = $Session.WorkFolderPath
@@ -477,8 +478,69 @@ function Show-StepCreaterMainWindow {
         SuppressEdit     = $false
     }
 
-    # Mutable reference for remove-evidence callback (filled in after $assignToCurrent is defined)
-    $removeBox = @{}
+    $window.Tag = [pscustomobject]@{
+        Session  = $Session
+        Controls = $c
+        Baseline = (Get-ProcedureHash -Procedure $Session.Procedure)
+    }
+
+    # ---- Hashtable boxes (defined early so closures can reference them) ----
+
+    # Selection state for unassigned tray
+    $selBox = @{ Ref = $null }
+
+    # Unassigned tray refresh box
+    $traySelectBox = @{}
+    $traySelectBox.Refresh = {
+        Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnSelect $traySelectBox.OnSelect -SelectedRef $selBox.Ref
+    }.GetNewClosure()
+    $traySelectBox.OnSelect = {
+        param($ref)
+        $selBox.Ref = $ref
+        & $traySelectBox.Refresh
+    }.GetNewClosure()
+
+    # Edit-mode procedure image tray box
+    $editProcBox = @{}
+    $editProcBox.Refresh = {
+        Update-StepImageTray -Session $Session -StepIndex $c.StepList.SelectedIndex -TrayPanel $c.EditEvidenceTray -Kind procedure -OnRemove $editProcBox.OnRemove
+    }.GetNewClosure()
+    $editProcBox.OnRemove = {
+        param($imgRef)
+        $idx = $c.StepList.SelectedIndex
+        if ($idx -lt 0) { return }
+        $Session.Procedure.Steps[$idx].ProcedureImages.Remove($imgRef) | Out-Null
+        $Session.UnassignedScreenshots.Add($imgRef) | Out-Null
+        & $editProcBox.Refresh
+        & $traySelectBox.Refresh
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+        Update-DirtyIndicator -Window $window
+    }.GetNewClosure()
+
+    # Execute-mode evidence tray box
+    $execEvidBox = @{}
+    $execEvidBox.Refresh = {
+        $idx = $c.ExecChecklist.SelectedIndex
+        if ($idx -lt 0) {
+            $c.ExecEvidenceTray.Children.Clear()
+            return
+        }
+        Update-StepImageTray -Session $Session -StepIndex $idx -TrayPanel $c.ExecEvidenceTray -Kind evidence -OnRemove $execEvidBox.OnRemove
+        Update-StepImageTray -Session $Session -StepIndex $idx -TrayPanel $c.ExecProcImageTray -Kind procedure -ReadOnly
+    }.GetNewClosure()
+    $execEvidBox.OnRemove = {
+        param($imgRef)
+        $idx = $c.ExecChecklist.SelectedIndex
+        if ($idx -lt 0) { return }
+        $Session.Procedure.Steps[$idx].Evidence.Remove($imgRef) | Out-Null
+        $Session.UnassignedScreenshots.Add($imgRef) | Out-Null
+        & $execEvidBox.Refresh
+        & $traySelectBox.Refresh
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+        Update-DirtyIndicator -Window $window
+    }.GetNewClosure()
 
     $loadStep = {
         param($idx)
@@ -505,7 +567,7 @@ function Show-StepCreaterMainWindow {
         $c.CboStatus.SelectedIndex = @('pending','done','ng','skipped').IndexOf($step.Status)
         $editorState.SuppressEdit = $false
         $editorState.CurrentStepIndex = $idx
-        Update-EditEvidenceTray -Session $Session -StepIndex $idx -TrayPanel $c.EditEvidenceTray -OnRemove $removeBox.Fn
+        & $editProcBox.Refresh
     }.GetNewClosure()
 
     $saveEdits = {
@@ -615,13 +677,46 @@ function Show-StepCreaterMainWindow {
             $dst = Join-Path $imagesDir $name
             Copy-Item -LiteralPath $src -Destination $dst -Force
             $ref = [ScreenshotRef]::new($name, (Get-Date), 'full')
-            $step.Evidence.Add($ref) | Out-Null
+            $step.ProcedureImages.Add($ref) | Out-Null
         }
-        Update-EditEvidenceTray -Session $Session -StepIndex $idx -TrayPanel $c.EditEvidenceTray -OnRemove $removeEvidenceFromStep
+        & $editProcBox.Refresh
         Save-WorkSession -Session $Session
         $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
         Update-DirtyIndicator -Window $window
         $c.StatusText.Text = "$($dlg.FileNames.Count) 個の画像を Step $($step.Id) に追加しました。"
+    }.GetNewClosure())
+
+    # BtnAddSelected: assign selected unassigned image to current step (mode-dependent)
+    $c.BtnAddSelected.Add_Click({
+        if (-not $selBox.Ref) {
+            [System.Windows.MessageBox]::Show('未割当スクリーンショットを1つ選択してください。','情報','OK','Information') | Out-Null
+            return
+        }
+        $ref = $selBox.Ref
+        if ($Session.Mode -eq 'Execute') {
+            $idx = $c.ExecChecklist.SelectedIndex
+            if ($idx -lt 0) {
+                [System.Windows.MessageBox]::Show('割当先のStepを選択してください。','情報','OK','Information') | Out-Null
+                return
+            }
+            $Session.UnassignedScreenshots.Remove($ref) | Out-Null
+            $Session.Procedure.Steps[$idx].Evidence.Add($ref) | Out-Null
+            & $execEvidBox.Refresh
+        } else {
+            $idx = $c.StepList.SelectedIndex
+            if ($idx -lt 0) {
+                [System.Windows.MessageBox]::Show('割当先のStepを選択してください。','情報','OK','Information') | Out-Null
+                return
+            }
+            $Session.UnassignedScreenshots.Remove($ref) | Out-Null
+            $Session.Procedure.Steps[$idx].ProcedureImages.Add($ref) | Out-Null
+            & $editProcBox.Refresh
+        }
+        $selBox.Ref = $null
+        & $traySelectBox.Refresh
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+        Update-DirtyIndicator -Window $window
     }.GetNewClosure())
 
     $doSave = {
@@ -656,49 +751,8 @@ function Show-StepCreaterMainWindow {
     )
     $window.InputBindings.Add($kb) | Out-Null
 
-    $window.Tag = [pscustomobject]@{
-        Session  = $Session
-        Controls = $c
-        Baseline = (Get-ProcedureHash -Procedure $Session.Procedure)
-    }
-
-    # Use a hashtable wrapper so the closure can reference its own scriptblock
-    # for recursion via mutable reference. GetNewClosure() captures variables
-    # at call-time, so a self-referencing scriptblock variable would otherwise
-    # capture $null (since the assignment has not completed yet).
-    $assignBox = @{}
-    $assignBox.Fn = {
-        param($ref)
-        $idx = $c.StepList.SelectedIndex
-        if ($idx -lt 0) {
-            [System.Windows.MessageBox]::Show('割当先のStepを先に選択してください。', '情報', 'OK', 'Information') | Out-Null
-            return
-        }
-        $Session.UnassignedScreenshots.Remove($ref) | Out-Null
-        $Session.Procedure.Steps[$idx].Evidence.Add($ref) | Out-Null
-        Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignBox.Fn
-        Save-WorkSession -Session $Session
-        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
-        Update-DirtyIndicator -Window $window
-    }.GetNewClosure()
-    $assignToCurrent = $assignBox.Fn
-    Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
-
-    # Remove-evidence callback — uses hashtable indirection to avoid self-reference null issue
-    $removeBox.Fn = {
-        param($evRef)
-        $idx = $editorState.CurrentStepIndex
-        if ($idx -lt 0) { return }
-        $step = $Session.Procedure.Steps[$idx]
-        $step.Evidence.Remove($evRef) | Out-Null
-        $Session.UnassignedScreenshots.Add($evRef) | Out-Null
-        Update-EditEvidenceTray -Session $Session -StepIndex $idx -TrayPanel $c.EditEvidenceTray -OnRemove $removeBox.Fn
-        Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
-        Save-WorkSession -Session $Session
-        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
-        Update-DirtyIndicator -Window $window
-    }.GetNewClosure()
-    $removeEvidenceFromStep = $removeBox.Fn
+    # Initial render of unassigned tray
+    & $traySelectBox.Refresh
 
     # ---- Execute mode helpers ----
     $loadExecStep = {
@@ -709,6 +763,7 @@ function Show-StepCreaterMainWindow {
             $c.ExecCommand.Text   = ''
             $c.ExecExpected.Text  = ''
             $c.ExecEvidenceTray.Children.Clear()
+            $c.ExecProcImageTray.Children.Clear()
             return
         }
         $step = $Session.Procedure.Steps[$idx]
@@ -717,34 +772,8 @@ function Show-StepCreaterMainWindow {
         $c.ExecCommand.Text   = $step.Command
         $c.ExecExpected.Text  = $step.ExpectedResult
 
-        $c.ExecEvidenceTray.Children.Clear()
-        foreach ($ev in $step.Evidence) {
-            $path = Join-Path $Session.WorkFolderPath ("images/" + $ev.FileName)
-            if (-not (Test-Path -LiteralPath $path)) { continue }
-
-            $btn = New-Object System.Windows.Controls.Button
-            $btn.Width = 110; $btn.Height = 78; $btn.Margin = '2'; $btn.Padding = 0
-            $btn.ToolTip = $ev.FileName + ' (ダブルクリックでマスク編集)'
-
-            $img = New-Object System.Windows.Controls.Image
-            $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
-            $bmp.BeginInit(); $bmp.CacheOption = 'OnLoad'
-            $bmp.UriSource = (New-Object System.Uri $path)
-            $bmp.DecodePixelWidth = 200
-            $bmp.EndInit()
-            $img.Source = $bmp; $img.Stretch = 'Uniform'
-            $btn.Content = $img
-
-            $evLocal = $ev
-            $sessionLocal = $Session
-            $btn.add_MouseDoubleClick({
-                $imgPath = Join-Path $sessionLocal.WorkFolderPath ("images/" + $evLocal.FileName)
-                [void](Show-MaskEditor -ImagePath $imgPath)
-                & $loadExecStep $c.ExecChecklist.SelectedIndex
-            }.GetNewClosure())
-
-            $c.ExecEvidenceTray.Children.Add($btn) | Out-Null
-        }
+        Update-StepImageTray -Session $Session -StepIndex $idx -TrayPanel $c.ExecProcImageTray -Kind procedure -ReadOnly
+        Update-StepImageTray -Session $Session -StepIndex $idx -TrayPanel $c.ExecEvidenceTray -Kind evidence -OnRemove $execEvidBox.OnRemove
     }.GetNewClosure()
 
     $applyMode = {
@@ -895,7 +924,7 @@ function Show-StepCreaterMainWindow {
                 Update-ExecChecklistUI -Session $Session -ListBox $c.ExecChecklist -ProgressLabel $c.ProgressLabel
                 & $loadExecStep $c.ExecChecklist.SelectedIndex
             } else {
-                Update-UnassignedTrayUI -Session $Session -TrayPanel $c.UnassignedTray -OnAssign $assignToCurrent
+                & $traySelectBox.Refresh
             }
             Save-WorkSession -Session $Session
             $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
@@ -1449,12 +1478,13 @@ function Update-UnassignedTrayUI {
     param(
         [Parameter(Mandatory)] [WorkSession]$Session,
         [Parameter(Mandatory)] $TrayPanel,
-        [Parameter()] [scriptblock]$OnAssign = $null
+        [Parameter()] [scriptblock]$OnSelect = $null,
+        [Parameter()] [ScreenshotRef]$SelectedRef = $null
     )
     Add-Type -AssemblyName PresentationFramework
 
     # If no callback supplied, install a no-op so click doesn't error.
-    if ($null -eq $OnAssign) { $OnAssign = { param($r); $null = $r } }
+    if ($null -eq $OnSelect) { $OnSelect = { param($r); $null = $r } }
 
     $TrayPanel.Children.Clear()
     foreach ($ref in $Session.UnassignedScreenshots) {
@@ -1463,7 +1493,13 @@ function Update-UnassignedTrayUI {
 
         $btn = New-Object System.Windows.Controls.Button
         $btn.Width = 120; $btn.Height = 80; $btn.Margin = '4'
-        $btn.ToolTip = $ref.FileName
+        $btn.ToolTip = $ref.FileName + ' (クリックで選択 / ダブルクリックでマスク編集)'
+
+        # Highlight if selected
+        if ($SelectedRef -and $ref.FileName -eq $SelectedRef.FileName) {
+            $btn.BorderBrush = [System.Windows.Media.Brushes]::DodgerBlue
+            $btn.BorderThickness = '3'
+        }
 
         $img = New-Object System.Windows.Controls.Image
         $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
@@ -1477,79 +1513,72 @@ function Update-UnassignedTrayUI {
         $btn.Content = $img
 
         $refLocal = $ref
-        $btn.Add_Click({ & $OnAssign $refLocal }.GetNewClosure())
+        $btn.Add_Click({ & $OnSelect $refLocal }.GetNewClosure())
         $sessionLocal = $Session
         $btn.add_MouseDoubleClick({
-            $path = Join-Path $sessionLocal.WorkFolderPath ("images/" + $refLocal.FileName)
-            [void](Show-MaskEditor -ImagePath $path)
+            $p = Join-Path $sessionLocal.WorkFolderPath ("images/" + $refLocal.FileName)
+            [void](Show-MaskEditor -ImagePath $p)
         }.GetNewClosure())
         $TrayPanel.Children.Add($btn) | Out-Null
     }
 }
 
-function Update-EditEvidenceTray {
+function Update-StepImageTray {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [WorkSession]$Session,
         [Parameter(Mandatory)] [int]$StepIndex,
         [Parameter(Mandatory)] $TrayPanel,
+        [Parameter(Mandatory)] [ValidateSet('procedure','evidence')] [string]$Kind,
+        [Parameter()] [switch]$ReadOnly,
         [Parameter()] [scriptblock]$OnRemove = $null
     )
     Add-Type -AssemblyName PresentationFramework
-
     if ($null -eq $OnRemove) { $OnRemove = { param($r); $null = $r } }
 
     $TrayPanel.Children.Clear()
     if ($StepIndex -lt 0 -or $StepIndex -ge $Session.Procedure.Steps.Count) { return }
     $step = $Session.Procedure.Steps[$StepIndex]
+    $list = if ($Kind -eq 'procedure') { $step.ProcedureImages } else { $step.Evidence }
 
-    foreach ($ev in $step.Evidence) {
-        $path = Join-Path $Session.WorkFolderPath ("images/" + $ev.FileName)
+    foreach ($img in $list) {
+        $path = Join-Path $Session.WorkFolderPath ("images/" + $img.FileName)
         if (-not (Test-Path -LiteralPath $path)) { continue }
 
-        # Wrapper grid with image button + small x button overlay
         $cell = New-Object System.Windows.Controls.Grid
-        $cell.Width  = 110
-        $cell.Height = 80
-        $cell.Margin = '2'
+        $cell.Width = 110; $cell.Height = 80; $cell.Margin = '2'
 
         $btn = New-Object System.Windows.Controls.Button
         $btn.Padding = '0'
-        $btn.ToolTip = $ev.FileName + ' (ダブルクリックでマスク編集)'
-
-        $img = New-Object System.Windows.Controls.Image
+        $btn.ToolTip = $img.FileName + ' (ダブルクリックで拡大/マスク編集)'
+        $imgCtl = New-Object System.Windows.Controls.Image
         $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
         $bmp.BeginInit(); $bmp.CacheOption = 'OnLoad'
         $bmp.UriSource = (New-Object System.Uri $path)
         $bmp.DecodePixelWidth = 220
         $bmp.EndInit()
-        $img.Source = $bmp
-        $img.Stretch = 'Uniform'
-        $btn.Content = $img
+        $imgCtl.Source = $bmp; $imgCtl.Stretch = 'Uniform'
+        $btn.Content = $imgCtl
 
-        $evLocal = $ev
+        $imgLocal = $img
         $sessionLocal = $Session
         $btn.add_MouseDoubleClick({
-            $imgPath = Join-Path $sessionLocal.WorkFolderPath ("images/" + $evLocal.FileName)
-            [void](Show-MaskEditor -ImagePath $imgPath)
+            $p = Join-Path $sessionLocal.WorkFolderPath ("images/" + $imgLocal.FileName)
+            [void](Show-MaskEditor -ImagePath $p)
         }.GetNewClosure())
+        $cell.Children.Add($btn) | Out-Null
 
-        # Delete button overlay (top-right corner)
-        $delBtn = New-Object System.Windows.Controls.Button
-        $delBtn.Content   = 'x'
-        $delBtn.Width     = 18
-        $delBtn.Height    = 18
-        $delBtn.Padding   = '0'
-        $delBtn.FontSize  = 10
-        $delBtn.HorizontalAlignment = 'Right'
-        $delBtn.VerticalAlignment   = 'Top'
-        $delBtn.Margin    = '0,2,2,0'
-        $delBtn.ToolTip   = 'この画像を Step から外す（ファイルは残ります）'
-        $delBtn.Background = [System.Windows.Media.Brushes]::White
-        $delBtn.add_Click({ & $OnRemove $evLocal }.GetNewClosure())
+        if (-not $ReadOnly) {
+            $delBtn = New-Object System.Windows.Controls.Button
+            $delBtn.Content = 'x'
+            $delBtn.Width = 18; $delBtn.Height = 18; $delBtn.Padding = '0'; $delBtn.FontSize = 10
+            $delBtn.HorizontalAlignment = 'Right'; $delBtn.VerticalAlignment = 'Top'; $delBtn.Margin = '0,2,2,0'
+            $delBtn.ToolTip = 'この画像を外す（ファイルは残ります）'
+            $delBtn.Background = [System.Windows.Media.Brushes]::White
+            $delBtn.add_Click({ & $OnRemove $imgLocal }.GetNewClosure())
+            $cell.Children.Add($delBtn) | Out-Null
+        }
 
-        $cell.Children.Add($btn)    | Out-Null
-        $cell.Children.Add($delBtn) | Out-Null
         $TrayPanel.Children.Add($cell) | Out-Null
     }
 }

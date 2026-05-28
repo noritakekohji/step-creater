@@ -35,7 +35,8 @@
             'ProgressLabel','ExecChecklist',
             'ExecStepTitle','ExecBody','ExecCommand','BtnCopyCommand','ExecExpected',
             'ExecEvidenceTray','BtnComplete','BtnNg','BtnSkip',
-            'EditEvidenceTray','BtnAddEvidence'
+            'EditEvidenceTray','BtnAddEvidence',
+            'BtnAddSelected','UnassignedLabel','ExecProcImageTray'
         )) {
             $window.FindName($name) | Should -Not -BeNullOrEmpty -Because "$name should exist in XAML"
         }

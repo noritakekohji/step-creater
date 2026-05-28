@@ -1,4 +1,4 @@
-﻿using module '..\StepCreater.psd1'
+using module '..\StepCreater.psd1'
 
 Describe 'Unassigned tray callback (self-referencing closure)' {
     BeforeAll {
@@ -6,13 +6,13 @@ Describe 'Unassigned tray callback (self-referencing closure)' {
         Add-Type -AssemblyName System.Drawing
     }
 
-    It 'Update-UnassignedTrayUI is callable with the runtime callback without null OnAssign error' {
+    It 'Update-UnassignedTrayUI is callable with the runtime callback without null OnSelect error' {
         $tmp = Join-Path $TestDrive ("wf-selfref-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
         New-StepCreaterWorkfolder -Path $tmp -Title 'SelfRef' | Out-Null
         $session = Open-StepCreaterWorkfolder -Path $tmp
         $session.Procedure.AddStep('A') | Out-Null
 
-        # Construct window (NoShow) so $assignToCurrent is wired
+        # Construct window (NoShow) so the tray box is wired
         $win = Show-StepCreaterMainWindow -Session $session -NoShow
 
         # Add a real PNG so the tray button is rendered
@@ -26,25 +26,24 @@ Describe 'Unassigned tray callback (self-referencing closure)' {
         # Locate the tray panel from the built window
         $tray = $win.FindName('UnassignedTray')
 
-        # Construct a self-referencing callback using the same pattern as the real fix:
-        # wrap the scriptblock in a hashtable so the closure resolves it via property access.
+        # Construct a self-referencing callback using the hashtable-box pattern:
         $box = @{}
         $box.Fn = {
             param($imgRef)
             $null = $imgRef
-            Update-UnassignedTrayUI -Session $session -TrayPanel $tray -OnAssign $box.Fn
+            Update-UnassignedTrayUI -Session $session -TrayPanel $tray -OnSelect $box.Fn
         }.GetNewClosure()
 
-        { Update-UnassignedTrayUI -Session $session -TrayPanel $tray -OnAssign $box.Fn } | Should -Not -Throw
+        { Update-UnassignedTrayUI -Session $session -TrayPanel $tray -OnSelect $box.Fn } | Should -Not -Throw
         { & $box.Fn $refImg } | Should -Not -Throw
     }
 
-    It 'Update-UnassignedTrayUI accepts $null OnAssign and uses no-op (defensive)' {
+    It 'Update-UnassignedTrayUI accepts $null OnSelect and uses no-op (defensive)' {
         $tmp = Join-Path $TestDrive ("wf-noop-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
         New-StepCreaterWorkfolder -Path $tmp -Title 'Noop' | Out-Null
         $session = Open-StepCreaterWorkfolder -Path $tmp
 
         $panel = New-Object System.Windows.Controls.WrapPanel
-        { Update-UnassignedTrayUI -Session $session -TrayPanel $panel -OnAssign $null } | Should -Not -Throw
+        { Update-UnassignedTrayUI -Session $session -TrayPanel $panel -OnSelect $null } | Should -Not -Throw
     }
 }
