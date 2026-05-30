@@ -2020,12 +2020,18 @@ function Show-MaskEditor {
     }.GetNewClosure())
 
     $btnSave.Add_Click({
+        $leaf = Split-Path -Leaf $ImagePath
+        $msg = "編集内容を画像ファイルに保存します。よろしいですか?`n`n保存先: $ImagePath`n原本退避: " +
+               (Join-Path (Join-Path (Split-Path -Parent $ImagePath) '.originals') $leaf)
+        $r = [System.Windows.MessageBox]::Show($msg, '保存確認', 'YesNo', 'Question')
+        if ($r -ne 'Yes') { return }
+
         $imagesDir = Split-Path -Parent $ImagePath
         $originalsDir = Join-Path $imagesDir '.originals'
         if (-not (Test-Path -LiteralPath $originalsDir)) {
             New-Item -ItemType Directory -Path $originalsDir -Force | Out-Null
         }
-        $originalDest = Join-Path $originalsDir (Split-Path -Leaf $ImagePath)
+        $originalDest = Join-Path $originalsDir $leaf
         if (-not (Test-Path -LiteralPath $originalDest)) {
             Copy-Item -LiteralPath $ImagePath -Destination $originalDest -Force
         }
