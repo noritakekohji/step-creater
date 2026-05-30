@@ -26,6 +26,7 @@
         'Initialize-StepCreaterWin32',
         'Get-CaptureFileName',
         'Save-BitmapPng',
+        'Read-BitmapNoLock',
         'Invoke-FullScreenCapture',
         'Invoke-ActiveWindowCapture',
         'ConvertTo-HotkeySpec',

@@ -1092,6 +1092,8 @@ function Save-BitmapPng {
     <#
     .SYNOPSIS
       Saves a bitmap as PNG to a file path, bypassing GDI+'s issue with non-ASCII paths.
+      Retries briefly on IOException (file in use), useful when a transient antivirus
+      scan or thumbnail render briefly holds the destination handle.
     #>
     [CmdletBinding()]
     param(
@@ -1106,10 +1108,38 @@ function Save-BitmapPng {
     $ms = New-Object System.IO.MemoryStream
     try {
         $Bitmap.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-        [System.IO.File]::WriteAllBytes($Path, $ms.ToArray())
+        $bytes = $ms.ToArray()
+        $lastErr = $null
+        for ($attempt = 1; $attempt -le 5; $attempt++) {
+            try {
+                [System.IO.File]::WriteAllBytes($Path, $bytes)
+                return
+            } catch [System.IO.IOException] {
+                $lastErr = $_
+                Start-Sleep -Milliseconds (50 * $attempt)
+            }
+        }
+        throw $lastErr
     } finally {
         $ms.Dispose()
     }
+}
+
+function Read-BitmapNoLock {
+    <#
+    .SYNOPSIS
+      Loads a Bitmap from a file WITHOUT holding the file handle.
+      Bitmap.FromFile keeps the underlying file locked for the lifetime of the
+      bitmap, which prevents subsequent writes to the same path. Reading the
+      bytes into memory and constructing the bitmap from a stream avoids that.
+    #>
+    [CmdletBinding()]
+    [OutputType([System.Drawing.Bitmap])]
+    param([Parameter(Mandatory)] [string]$Path)
+    Add-Type -AssemblyName System.Drawing
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $ms = New-Object System.IO.MemoryStream (,$bytes)
+    return [System.Drawing.Bitmap]::FromStream($ms)
 }
 
 function Invoke-FullScreenCapture {
@@ -1452,7 +1482,7 @@ function Save-StepCreaterCapture {
             $vs = [System.Windows.Forms.SystemInformation]::VirtualScreen
             $mp = New-Object System.Drawing.Point ($cursor.X - $vs.Left), ($cursor.Y - $vs.Top)
 
-            $src = [System.Drawing.Bitmap]::FromFile($tmpRaw)
+            $src = Read-BitmapNoLock -Path $tmpRaw
             try {
                 $annot = Add-CaptureAnnotation -SourceBitmap $src -MousePosition $mp -Caption $caption
                 Save-BitmapPng -Bitmap $annot -Path $finalPath
@@ -1684,7 +1714,7 @@ function Show-MaskEditor {
     $btnSave      = $win.FindName('BtnSave')
     $btnCancel    = $win.FindName('BtnCancel')
 
-    $current = [System.Drawing.Bitmap]::FromFile($ImagePath)
+    $current = Read-BitmapNoLock -Path $ImagePath
     $history = New-Object System.Collections.Generic.Stack[System.Drawing.Bitmap]
     $state   = [pscustomobject]@{ Down = $false; X0 = 0; Y0 = 0; Saved = $false }
 
