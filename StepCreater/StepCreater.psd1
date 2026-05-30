@@ -53,7 +53,11 @@
         'Get-DashboardSummary',
         'Update-DashboardPieChart',
         'Export-DashboardCsv',
-        'Show-DashboardWindow'
+        'Show-DashboardWindow',
+        'ConvertTo-SanitizedFolderName',
+        'Save-SampleCsvTemplate',
+        'Import-ProceduresFromCsv',
+        'Export-ProceduresToCsv'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

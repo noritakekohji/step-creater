@@ -12,6 +12,9 @@
                     <MenuItem x:Name="MenuExportHtmlCreate" Header="HTML出力 作成版(_E)..."/>
                 <MenuItem x:Name="MenuExportHtmlExec"   Header="HTML出力 実施版..."/>
                 <Separator/>
+                <MenuItem x:Name="MenuCsvImport"        Header="CSV から手順書を一括作成(_C)..."/>
+                <MenuItem x:Name="MenuCsvSampleSave"    Header="サンプル CSV テンプレートを保存..."/>
+                <Separator/>
                 <MenuItem x:Name="MenuExit" Header="終了(_X)"/>
             </MenuItem>
             <MenuItem x:Name="MenuTemplates" Header="テンプレ挿入(_T)"/>

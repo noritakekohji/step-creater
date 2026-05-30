@@ -535,7 +535,7 @@ function Show-StepCreaterMainWindow {
 
     $c = @{}
     foreach ($name in @(
-        'MenuNew','MenuOpen','MenuSave','MenuExportHtmlCreate','MenuExportHtmlExec','MenuExit',
+        'MenuNew','MenuOpen','MenuSave','MenuExportHtmlCreate','MenuExportHtmlExec','MenuCsvImport','MenuCsvSampleSave','MenuExit',
         'MenuTemplates','MenuSettings','MenuProcInfo','MenuDashboard',
         'StatusText','DirtyText',
         'TabEdit','TabExecute','TabCapture',
@@ -834,6 +834,47 @@ function Show-StepCreaterMainWindow {
     $c.MenuExportHtmlCreate.Add_Click({ & $exportHtml 'creation' 'create' }.GetNewClosure())
     $c.MenuExportHtmlExec.Add_Click({   & $exportHtml 'execution' 'exec'  }.GetNewClosure())
     $c.MenuExit.Add_Click({ $window.Close() }.GetNewClosure())
+
+    $c.MenuCsvSampleSave.Add_Click({
+        Add-Type -AssemblyName System.Windows.Forms
+        $sfd = [System.Windows.Forms.SaveFileDialog]::new()
+        $sfd.Filter = 'CSV (*.csv)|*.csv'
+        $sfd.FileName = 'stepcreater_template.csv'
+        if ($sfd.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        try {
+            Save-SampleCsvTemplate -Path $sfd.FileName
+            $r = [System.Windows.MessageBox]::Show(
+                "サンプルCSVを保存しました:`n$($sfd.FileName)`n`nExcel で開きますか?",
+                'StepCreater', 'YesNo', 'Information')
+            if ($r -eq 'Yes') { Start-Process $sfd.FileName }
+        } catch {
+            [System.Windows.MessageBox]::Show("保存に失敗: $($_.Exception.Message)", 'エラー', 'OK', 'Error') | Out-Null
+        }
+    }.GetNewClosure())
+
+    $c.MenuCsvImport.Add_Click({
+        Add-Type -AssemblyName System.Windows.Forms
+        $ofd = [System.Windows.Forms.OpenFileDialog]::new()
+        $ofd.Filter = 'CSV (*.csv)|*.csv'
+        if ($ofd.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        $csvPath = $ofd.FileName
+
+        $fbd = [System.Windows.Forms.FolderBrowserDialog]::new()
+        $fbd.Description = '出力先 親フォルダを選択（各手順書はこの下にサブフォルダで作成されます）'
+        if ($fbd.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+        try {
+            $result = Import-ProceduresFromCsv -CsvPath $csvPath -OutputFolder $fbd.SelectedPath
+            $msg = "作成: $($result.Created.Count) 件`n"
+            if ($result.Errors.Count -gt 0) {
+                $msg += "`nスキップ/エラー: $($result.Errors.Count) 件`n" + ($result.Errors -join "`n")
+            }
+            [System.Windows.MessageBox]::Show($msg, 'CSV インポート結果', 'OK', 'Information') | Out-Null
+            $c.StatusText.Text = "CSV インポート完了: $($result.Created.Count) 件"
+        } catch {
+            [System.Windows.MessageBox]::Show("インポート失敗: $($_.Exception.Message)", 'エラー', 'OK', 'Error') | Out-Null
+        }
+    }.GetNewClosure())
 
     # Ctrl+S keyboard shortcut
     $saveCommand = [System.Windows.Input.RoutedCommand]::new()
@@ -2577,6 +2618,200 @@ function Export-DashboardCsv {
     [System.IO.File]::WriteAllLines($Path, $csv, $utf8Bom)
 }
 
+# ---- CSV bulk import / export ----
+
+$script:CsvBulkColumns = @(
+    'ProcedureTitle','WorkfolderName',
+    'DefaultAuthor','DefaultReviewer','DefaultExecutor','DefaultVerifier',
+    'StepTitle','StepBody','StepCommand','StepExpected','StepNote','StepStatus',
+    'StepAuthor','StepReviewer','StepExecutor','StepVerifier'
+)
+
+function ConvertTo-SanitizedFolderName {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Name)
+    if ([string]::IsNullOrWhiteSpace($Name)) { return '' }
+    $sanitized = $Name -replace '[\\/:*?"<>|]', '_'
+    return $sanitized.Trim()
+}
+
+function Save-SampleCsvTemplate {
+    <#
+    .SYNOPSIS
+      Writes a UTF-8 BOM sample CSV with 2 procedures and a few steps each.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string]$Path)
+    $rows = New-Object System.Collections.Generic.List[object]
+    $rows.Add([pscustomobject]@{
+        ProcedureTitle='サーバ構築手順'; WorkfolderName='server-setup'
+        DefaultAuthor='山田 太郎'; DefaultReviewer='鈴木 花子'; DefaultExecutor='山田 太郎'; DefaultVerifier='鈴木 花子'
+        StepTitle='IIS をインストール'; StepBody='Server Manager から Web-Server を追加'; StepCommand='Install-WindowsFeature -Name Web-Server'
+        StepExpected='Exit code 0'; StepNote=''; StepStatus='creating'
+        StepAuthor=''; StepReviewer=''; StepExecutor=''; StepVerifier=''
+    }) | Out-Null
+    $rows.Add([pscustomobject]@{
+        ProcedureTitle='サーバ構築手順'; WorkfolderName=''
+        DefaultAuthor=''; DefaultReviewer=''; DefaultExecutor=''; DefaultVerifier=''
+        StepTitle='ファイアウォール設定'; StepBody='80/443 を許可'; StepCommand='New-NetFirewallRule -DisplayName Web -LocalPort 80,443 -Protocol TCP -Action Allow'
+        StepExpected=''; StepNote=''; StepStatus='creating'
+        StepAuthor=''; StepReviewer=''; StepExecutor=''; StepVerifier=''
+    }) | Out-Null
+    $rows.Add([pscustomobject]@{
+        ProcedureTitle='クライアント設定手順'; WorkfolderName='client-setup'
+        DefaultAuthor='佐藤 一郎'; DefaultReviewer=''; DefaultExecutor=''; DefaultVerifier=''
+        StepTitle='初期設定'; StepBody='プロキシ設定を反映'; StepCommand=''
+        StepExpected=''; StepNote='事前に管理者権限が必要'; StepStatus='creating'
+        StepAuthor=''; StepReviewer=''; StepExecutor=''; StepVerifier=''
+    }) | Out-Null
+    # Ensure column order
+    $csv = $rows | Select-Object -Property $script:CsvBulkColumns | ConvertTo-Csv -NoTypeInformation
+    $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+    [System.IO.File]::WriteAllLines($Path, $csv, $utf8Bom)
+}
+
+function Import-ProceduresFromCsv {
+    <#
+    .SYNOPSIS
+      Reads a CSV (UTF-8 BOM) and writes one workfolder per ProcedureTitle group.
+      Returns an object @{ Created=[string[]]; Errors=[string[]] }.
+    #>
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
+    param(
+        [Parameter(Mandatory)] [string]$CsvPath,
+        [Parameter(Mandatory)] [string]$OutputFolder,
+        [Parameter()] [switch]$Force
+    )
+
+    if (-not (Test-Path -LiteralPath $CsvPath))      { throw "CSV not found: $CsvPath" }
+    if (-not (Test-Path -LiteralPath $OutputFolder)) { New-Item -ItemType Directory -Path $OutputFolder -Force | Out-Null }
+
+    $rows = Import-Csv -LiteralPath $CsvPath -Encoding UTF8
+    if (-not $rows) { return [pscustomobject]@{ Created=@(); Errors=@('CSVに行がありません。') } }
+
+    # Validate required columns
+    $headerProps = @($rows[0].PSObject.Properties.Name)
+    foreach ($req in 'ProcedureTitle','StepTitle') {
+        if ($req -notin $headerProps) {
+            return [pscustomobject]@{ Created=@(); Errors=@("必須カラムが見つかりません: $req") }
+        }
+    }
+
+    $created = New-Object System.Collections.Generic.List[string]
+    $errors  = New-Object System.Collections.Generic.List[string]
+    $seq = 0
+    $groups = $rows | Where-Object { $_.ProcedureTitle } | Group-Object -Property ProcedureTitle
+
+    foreach ($g in $groups) {
+        $seq++
+        try {
+            $title = $g.Name
+            $wfNameRow  = $g.Group | Where-Object { $_.PSObject.Properties['WorkfolderName'] -and $_.WorkfolderName } | Select-Object -First 1
+            $wfNameSeed = if ($wfNameRow) { $wfNameRow.WorkfolderName } else { '' }
+            $wfName = ConvertTo-SanitizedFolderName $wfNameSeed
+            if (-not $wfName) { $wfName = ConvertTo-SanitizedFolderName $title }
+            if (-not $wfName) { $wfName = "procedure-$seq" }
+
+            $wfPath = Join-Path $OutputFolder $wfName
+            if ((Test-Path -LiteralPath $wfPath) -and -not $Force) {
+                $existing = Get-ChildItem -LiteralPath $wfPath -Force -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($existing) {
+                    $errors.Add("既に存在 (-Force でスキップ可): $wfPath") | Out-Null
+                    continue
+                }
+            }
+
+            # Build the ProcedureDoc
+            $doc = [ProcedureDoc]::new($title)
+            $doc.Created = Get-Date
+            foreach ($r in $g.Group) {
+                foreach ($f in 'DefaultAuthor','DefaultReviewer','DefaultExecutor','DefaultVerifier') {
+                    if ($r.PSObject.Properties[$f] -and $r.$f -and -not $doc.$f) { $doc.$f = $r.$f }
+                }
+            }
+
+            foreach ($r in $g.Group) {
+                if (-not $r.StepTitle) { continue }   # skip blank step rows
+                $step = $doc.AddStep($r.StepTitle)
+                if ($r.PSObject.Properties['StepBody']     -and $r.StepBody)     { $step.BodyMarkdown   = $r.StepBody }
+                if ($r.PSObject.Properties['StepCommand']  -and $r.StepCommand)  { $step.Command        = $r.StepCommand }
+                if ($r.PSObject.Properties['StepExpected'] -and $r.StepExpected) { $step.ExpectedResult = $r.StepExpected }
+                if ($r.PSObject.Properties['StepNote']     -and $r.StepNote)     { $step.Note           = $r.StepNote }
+                if ($r.PSObject.Properties['StepStatus']   -and $r.StepStatus)   {
+                    if ($r.StepStatus -in 'creating','reviewing','created','executing','verifying','ng','aborted','done') {
+                        $step.Status = $r.StepStatus
+                    }
+                }
+                if ($r.PSObject.Properties['StepAuthor']   -and $r.StepAuthor)   { $step.Author   = $r.StepAuthor }
+                if ($r.PSObject.Properties['StepReviewer'] -and $r.StepReviewer) { $step.Reviewer = $r.StepReviewer }
+                if ($r.PSObject.Properties['StepExecutor'] -and $r.StepExecutor) { $step.Executor = $r.StepExecutor }
+                if ($r.PSObject.Properties['StepVerifier'] -and $r.StepVerifier) { $step.Verifier = $r.StepVerifier }
+            }
+
+            New-StepCreaterWorkfolder -Path $wfPath -Title $title -Force | Out-Null
+            $mdPath = Join-Path $wfPath 'procedure.md'
+            $md = Write-Procedure -Procedure $doc
+            Set-Content -LiteralPath $mdPath -Value $md -Encoding UTF8
+            $created.Add($wfPath) | Out-Null
+        } catch {
+            $errors.Add("グループ '$($g.Name)': $($_.Exception.Message)") | Out-Null
+        }
+    }
+    return [pscustomobject]@{ Created = $created.ToArray(); Errors = $errors.ToArray() }
+}
+
+function Export-ProceduresToCsv {
+    <#
+    .SYNOPSIS
+      Scans a parent folder for procedure.md files and writes one UTF-8 BOM CSV
+      with one row per Step (compatible with Import-ProceduresFromCsv).
+    #>
+    [CmdletBinding()]
+    [OutputType([int])]
+    param(
+        [Parameter(Mandatory)] [string]$ParentFolder,
+        [Parameter(Mandatory)] [string]$CsvPath
+    )
+    if (-not (Test-Path -LiteralPath $ParentFolder)) { throw "Parent folder not found: $ParentFolder" }
+
+    $rows = New-Object System.Collections.Generic.List[object]
+    $mdFiles = Get-ChildItem -LiteralPath $ParentFolder -Filter 'procedure.md' -Recurse -File -ErrorAction SilentlyContinue
+    foreach ($mdFile in $mdFiles) {
+        try {
+            $doc = Read-Procedure -Path $mdFile.FullName
+        } catch { continue }
+        $wfName = Split-Path -Leaf $mdFile.DirectoryName
+        $first  = $true
+        foreach ($step in $doc.Steps) {
+            $rows.Add([pscustomobject]@{
+                ProcedureTitle = $doc.Title
+                WorkfolderName = $wfName
+                DefaultAuthor    = if ($first) { $doc.DefaultAuthor }    else { '' }
+                DefaultReviewer  = if ($first) { $doc.DefaultReviewer }  else { '' }
+                DefaultExecutor  = if ($first) { $doc.DefaultExecutor }  else { '' }
+                DefaultVerifier  = if ($first) { $doc.DefaultVerifier }  else { '' }
+                StepTitle      = $step.Title
+                StepBody       = $step.BodyMarkdown
+                StepCommand    = $step.Command
+                StepExpected   = $step.ExpectedResult
+                StepNote       = $step.Note
+                StepStatus     = $step.Status
+                StepAuthor     = $step.Author
+                StepReviewer   = $step.Reviewer
+                StepExecutor   = $step.Executor
+                StepVerifier   = $step.Verifier
+            }) | Out-Null
+            $first = $false
+        }
+    }
+    $csv = $rows | Select-Object -Property $script:CsvBulkColumns | ConvertTo-Csv -NoTypeInformation
+    $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+    [System.IO.File]::WriteAllLines($CsvPath, $csv, $utf8Bom)
+    return $rows.Count
+}
+
 function Show-DashboardWindow {
     [CmdletBinding()]
     param(
@@ -2652,6 +2887,25 @@ function Show-DashboardWindow {
             $status.Text = "CSV出力: $($sfd.FileName)"
         } catch {
             [System.Windows.MessageBox]::Show("CSV出力に失敗: $($_.Exception.Message)",'エラー','OK','Error') | Out-Null
+        }
+    }.GetNewClosure())
+
+    $btnExportProc = $win.FindName('BtnExportProceduresCsv')
+    $btnExportProc.Add_Click({
+        if (-not $state.Parent) {
+            [System.Windows.MessageBox]::Show('親フォルダを先に選択してください。', '情報', 'OK', 'Information') | Out-Null
+            return
+        }
+        $sfd = [System.Windows.Forms.SaveFileDialog]::new()
+        $sfd.Filter = 'CSV (*.csv)|*.csv'
+        $sfd.FileName = ('procedures_' + (Get-Date -Format 'yyyy-MM-dd_HHmmss') + '.csv')
+        if ($sfd.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        try {
+            $n = Export-ProceduresToCsv -ParentFolder $state.Parent -CsvPath $sfd.FileName
+            $status.Text = "手順書一括CSV出力: $n 行"
+            [System.Windows.MessageBox]::Show("CSV を出力しました ($n 行):`n$($sfd.FileName)", 'StepCreater', 'OK', 'Information') | Out-Null
+        } catch {
+            [System.Windows.MessageBox]::Show("出力失敗: $($_.Exception.Message)", 'エラー', 'OK', 'Error') | Out-Null
         }
     }.GetNewClosure())
 
