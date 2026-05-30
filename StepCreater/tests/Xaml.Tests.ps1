@@ -68,7 +68,7 @@ Describe 'DashboardWindow.xaml' {
         $xml = [xml](Get-Content -LiteralPath $script:dwPath -Raw)
         $reader = [System.Xml.XmlNodeReader]::new($xml)
         $win = [Windows.Markup.XamlReader]::Load($reader)
-        foreach ($name in @('TxtParentPath','BtnPickParent','BtnRescan','BtnExportCsv','DashGrid','DashStatus','PieCanvas','SummaryGrid')) {
+        foreach ($name in @('TxtParentPath','BtnPickParent','BtnRescan','BtnExportCsv','DashGrid','DashStatus','PieCanvas','SummaryGrid','LegendPanel')) {
             $win.FindName($name) | Should -Not -BeNullOrEmpty -Because "$name should exist in DashboardWindow.xaml"
         }
     }

@@ -2337,10 +2337,11 @@ function Get-DashboardRows {
                 StepNo         = 0
                 StepId         = ''
                 StepTitle      = ''
+                ExpectedResult = ''
                 Status         = 'error'
-                Started        = ''
+                Executor       = ''
+                Verifier       = ''
                 Finished       = ''
-                Duration       = ''
                 Updated        = $updated
             }) | Out-Null
             continue
@@ -2349,7 +2350,6 @@ function Get-DashboardRows {
         $no = 0
         foreach ($step in $doc.Steps) {
             $no++
-            $started  = if ($step.Started)  { $step.Started.ToString('yyyy-MM-dd') }  else { '' }
             $finished = if ($step.Finished) { $step.Finished.ToString('yyyy-MM-dd') } else { '' }
             $rows.Add([pscustomobject]@{
                 Workfolder     = $wfName
@@ -2358,12 +2358,11 @@ function Get-DashboardRows {
                 StepNo         = $no
                 StepId         = $step.Id
                 StepTitle      = $step.Title
+                ExpectedResult = $step.ExpectedResult
                 Status         = $step.Status
                 Executor       = (Get-EffectiveRole -Step $step -Procedure $doc -Role Executor)
                 Verifier       = (Get-EffectiveRole -Step $step -Procedure $doc -Role Verifier)
-                Started        = $started
                 Finished       = $finished
-                Duration       = (Get-StepDuration -Step $step)
                 Updated        = $updated
             }) | Out-Null
         }
@@ -2420,7 +2419,8 @@ function Update-DashboardPieChart {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] $Canvas,
-        [Parameter(Mandatory)] $Counts   # pscustomobject with status keys → ints
+        [Parameter(Mandatory)] $Counts,  # pscustomobject with status keys → ints
+        [Parameter()] $LegendPanel = $null
     )
     Add-Type -AssemblyName PresentationFramework
 
@@ -2435,6 +2435,17 @@ function Update-DashboardPieChart {
         ng        = '#F44336'
         aborted   = '#795548'
         done      = '#4CAF50'
+    }
+
+    $displayMap = @{
+        creating  = '作成中'
+        reviewing = '確認中'
+        created   = '作成済'
+        executing = '実施中'
+        verifying = '再鑑中'
+        ng        = '結果NG'
+        aborted   = '中止'
+        done      = '完了'
     }
 
     $total = 0
@@ -2489,6 +2500,35 @@ function Update-DashboardPieChart {
         $Canvas.Children.Add($path) | Out-Null
         $start = $end
     }
+
+    if ($LegendPanel) {
+        $LegendPanel.Children.Clear()
+        foreach ($k in 'creating','reviewing','created','executing','verifying','ng','aborted','done') {
+            $n = [int]$Counts.$k
+            if ($n -le 0) { continue }
+            $row = New-Object System.Windows.Controls.StackPanel
+            $row.Orientation = 'Horizontal'
+            $row.Margin = '0,0,0,4'
+
+            $swatch = New-Object System.Windows.Shapes.Rectangle
+            $swatch.Width = 14
+            $swatch.Height = 14
+            $swatch.Fill = [System.Windows.Media.BrushConverter]::new().ConvertFromString($colorMap[$k])
+            $swatch.Stroke = [System.Windows.Media.Brushes]::DimGray
+            $swatch.StrokeThickness = 0.5
+            $swatch.VerticalAlignment = 'Center'
+            $swatch.Margin = '0,0,6,0'
+            $row.Children.Add($swatch) | Out-Null
+
+            $pct = if ($total -gt 0) { 100.0 * $n / $total } else { 0 }
+            $label = New-Object System.Windows.Controls.TextBlock
+            $label.Text = ('{0}  {1} ({2:N1}%)' -f $displayMap[$k], $n, $pct)
+            $label.VerticalAlignment = 'Center'
+            $row.Children.Add($label) | Out-Null
+
+            $LegendPanel.Children.Add($row) | Out-Null
+        }
+    }
 }
 
 function Export-DashboardCsv {
@@ -2530,6 +2570,7 @@ function Show-DashboardWindow {
     $grid        = $win.FindName('DashGrid')
     $status      = $win.FindName('DashStatus')
     $pieCanvas   = $win.FindName('PieCanvas')
+    $legendPanel = $win.FindName('LegendPanel')
     $summaryGrid = $win.FindName('SummaryGrid')
 
     $state = [pscustomobject]@{ Parent = $InitialParent; Rows = @() }
@@ -2546,7 +2587,7 @@ function Show-DashboardWindow {
             $grid.ItemsSource = $rows
             $summary = Get-DashboardSummary -Rows $rows
             $summaryGrid.ItemsSource = $summary.PerProcedure
-            Update-DashboardPieChart -Canvas $pieCanvas -Counts $summary.Total
+            Update-DashboardPieChart -Canvas $pieCanvas -Counts $summary.Total -LegendPanel $legendPanel
             $procCount = (@($rows | Select-Object -ExpandProperty WorkfolderPath -Unique)).Count
             $status.Text = "$procCount 件の手順書 / $($rows.Count) 行 を表示中。"
         } catch {

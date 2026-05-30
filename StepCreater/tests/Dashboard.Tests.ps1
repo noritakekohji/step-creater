@@ -12,6 +12,7 @@ Describe 'Get-DashboardRows' {
         $sa1 = $sessA.Procedure.AddStep('Setup'); $sa1.Status = 'done'
         $sa1.Started  = [datetime]'2026-05-27T10:00:00'
         $sa1.Finished = [datetime]'2026-05-27T10:05:00'
+        $sa1.ExpectedResult = 'OK'
         $sessA.Procedure.AddStep('Configure') | Out-Null
         Save-WorkSession -Session $sessA
 
@@ -31,15 +32,13 @@ Describe 'Get-DashboardRows' {
         $rowsA[0].StepNo                   | Should -Be 1
         $rowsA[0].StepId                   | Should -Be '01'
         $rowsA[0].StepTitle                | Should -Be 'Setup'
+        $rowsA[0].ExpectedResult           | Should -Be 'OK'
         $rowsA[0].Status                   | Should -Be 'done'
-        $rowsA[0].Started                  | Should -Be '2026-05-27'
         $rowsA[0].Finished                 | Should -Be '2026-05-27'
-        $rowsA[0].Duration                 | Should -Be '00:05:00'
 
         $rowB = @($rows | Where-Object { $_.Workfolder -eq 'B' })[0]
         $rowB.ProcedureTitle | Should -Be 'Proc B'
         $rowB.Status         | Should -Be 'ng'
-        $rowB.Duration       | Should -Be '-'
     }
 
     It 'includes a row with creating status step' {
@@ -142,6 +141,17 @@ Describe 'Update-DashboardPieChart' {
         $texts = @($canvas.Children | Where-Object { $_.GetType().Name -eq 'TextBlock' })
         $texts.Count | Should -Be 1
     }
+
+    It 'populates LegendPanel rows when supplied' {
+        $canvas = New-Object System.Windows.Controls.Canvas
+        $legend = New-Object System.Windows.Controls.StackPanel
+        $counts = [pscustomobject]@{
+            creating=2; reviewing=0; created=0; executing=1; verifying=0; ng=1; aborted=0; done=0
+        }
+        Update-DashboardPieChart -Canvas $canvas -Counts $counts -LegendPanel $legend
+        # 3 non-zero statuses → 3 legend rows
+        $legend.Children.Count | Should -Be 3
+    }
 }
 
 Describe 'Get-DashboardRows new columns' {
@@ -162,7 +172,7 @@ Describe 'Get-DashboardRows new columns' {
         $rows[0].Verifier | Should -Be 'StepVer'    # step override
     }
 
-    It 'emits dates only (yyyy-MM-dd) for Started and Finished' {
+    It 'emits dates only (yyyy-MM-dd) for Finished; no Started or Duration columns' {
         $tmp = Join-Path $TestDrive ("dash3-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
         New-Item -ItemType Directory -Path $tmp | Out-Null
         $wf = Join-Path $tmp 'W'
@@ -175,7 +185,20 @@ Describe 'Get-DashboardRows new columns' {
         Save-WorkSession -Session $sess
 
         $rows = @(Get-DashboardRows -ParentFolder $tmp)
-        $rows[0].Started  | Should -Be '2026-05-27'
         $rows[0].Finished | Should -Be '2026-05-27'
+        $rows[0].PSObject.Properties['Started']  | Should -BeNullOrEmpty
+        $rows[0].PSObject.Properties['Duration'] | Should -BeNullOrEmpty
+    }
+
+    It 'emits ExpectedResult column' {
+        $tmp = Join-Path $TestDrive ("dash-er-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-Item -ItemType Directory -Path $tmp | Out-Null
+        $wf = Join-Path $tmp 'W'
+        New-StepCreaterWorkfolder -Path $wf -Title 'Proc' | Out-Null
+        $sess = Open-StepCreaterWorkfolder -Path $wf
+        $s = $sess.Procedure.AddStep('Build'); $s.ExpectedResult = 'Compile OK'
+        Save-WorkSession -Session $sess
+        $rows = @(Get-DashboardRows -ParentFolder $tmp)
+        $rows[0].ExpectedResult | Should -Be 'Compile OK'
     }
 }

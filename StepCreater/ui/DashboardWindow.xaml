@@ -22,14 +22,16 @@
                 Background="#FAFAFA" Padding="8" Height="240">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="240"/>
+                    <ColumnDefinition Width="360"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="状態の内訳" FontWeight="Bold" Margin="0,0,0,4"/>
-                    <Canvas x:Name="PieCanvas" Width="200" Height="200"
-                            Background="White"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Canvas x:Name="PieCanvas" Width="200" Height="200" Background="White"/>
+                        <StackPanel x:Name="LegendPanel" Orientation="Vertical" Margin="8,0,0,0" VerticalAlignment="Top"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <DockPanel Grid.Column="1" Margin="12,0,0,0">
@@ -70,18 +72,17 @@
                   AlternatingRowBackground="#F5F5F5"
                   Margin="8,0,8,0">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="ワークフォルダ" Binding="{Binding Workfolder}" Width="160"/>
+                <DataGridTextColumn Header="ワークフォルダ" Binding="{Binding Workfolder}"     Width="160"/>
                 <DataGridTextColumn Header="手順書"         Binding="{Binding ProcedureTitle}" Width="220"/>
-                <DataGridTextColumn Header="#"              Binding="{Binding StepNo}" Width="40"/>
-                <DataGridTextColumn Header="Step ID"        Binding="{Binding StepId}" Width="60"/>
-                <DataGridTextColumn Header="Step タイトル"  Binding="{Binding StepTitle}" Width="240"/>
-                <DataGridTextColumn Header="状態"           Binding="{Binding Status}" Width="80"/>
-                <DataGridTextColumn Header="実施者"         Binding="{Binding Executor}" Width="100"/>
-                <DataGridTextColumn Header="再鑑者"         Binding="{Binding Verifier}" Width="100"/>
-                <DataGridTextColumn Header="開始"           Binding="{Binding Started}" Width="100"/>
-                <DataGridTextColumn Header="完了"           Binding="{Binding Finished}" Width="100"/>
-                <DataGridTextColumn Header="作業時間"       Binding="{Binding Duration}" Width="90"/>
-                <DataGridTextColumn Header="最終更新"       Binding="{Binding Updated}" Width="140"/>
+                <DataGridTextColumn Header="#"              Binding="{Binding StepNo}"         Width="40"/>
+                <DataGridTextColumn Header="Step ID"        Binding="{Binding StepId}"         Width="60"/>
+                <DataGridTextColumn Header="Step タイトル"  Binding="{Binding StepTitle}"      Width="220"/>
+                <DataGridTextColumn Header="想定結果"       Binding="{Binding ExpectedResult}" Width="240"/>
+                <DataGridTextColumn Header="状態"           Binding="{Binding Status}"         Width="80"/>
+                <DataGridTextColumn Header="実施者"         Binding="{Binding Executor}"       Width="100"/>
+                <DataGridTextColumn Header="再鑑者"         Binding="{Binding Verifier}"       Width="100"/>
+                <DataGridTextColumn Header="完了"           Binding="{Binding Finished}"       Width="100"/>
+                <DataGridTextColumn Header="最終更新"       Binding="{Binding Updated}"        Width="140"/>
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>
