@@ -224,17 +224,13 @@ Describe 'Edit mode role textboxes' {
         $s = $script:sessionR.Procedure.AddStep('Role Step')
         $s.Author   = 'Alice'
         $s.Reviewer = 'Bob'
-        $s.Executor = 'Carol'
-        $s.Verifier = 'Dave'
         $script:winR = Show-StepCreaterMainWindow -Session $script:sessionR -NoShow
     }
 
-    It 'loads role fields when step is selected' {
+    It 'loads Author and Reviewer when step is selected' {
         $script:winR.FindName('StepList').SelectedIndex = 0
         $script:winR.FindName('TxtAuthor').Text   | Should -Be 'Alice'
         $script:winR.FindName('TxtReviewer').Text | Should -Be 'Bob'
-        $script:winR.FindName('TxtExecutor').Text | Should -Be 'Carol'
-        $script:winR.FindName('TxtVerifier').Text | Should -Be 'Dave'
     }
 
     It 'TxtAuthor sync writes back to the Step' {
@@ -243,6 +239,37 @@ Describe 'Edit mode role textboxes' {
         $script:winR.FindName('TxtAuthor').RaiseEvent(
             [System.Windows.RoutedEventArgs]::new([System.Windows.UIElement]::LostFocusEvent))
         $script:sessionR.Procedure.Steps[0].Author | Should -Be 'NewAuthor'
+    }
+}
+
+Describe 'Execute mode role textboxes' {
+    BeforeEach {
+        $script:tmpER = Join-Path $TestDrive ("wf-er-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-StepCreaterWorkfolder -Path $script:tmpER -Title 'ER' | Out-Null
+        $script:sessionER = Open-StepCreaterWorkfolder -Path $script:tmpER
+        $script:sessionER.Procedure.AddStep('A') | Out-Null
+        $script:sessionER.Mode = 'Execute'
+        $script:winER = Show-StepCreaterMainWindow -Session $script:sessionER -NoShow
+    }
+
+    It 'TxtExecutor populates from step when selected' {
+        $s = $script:sessionER.Procedure.Steps[0]
+        $s.Executor = 'Alice'
+        $s.Verifier = 'Bob'
+        # Deselect then reselect to force SelectionChanged to fire
+        $script:winER.FindName('ExecChecklist').SelectedIndex = -1
+        $script:winER.FindName('ExecChecklist').SelectedIndex = 0
+        $script:winER.FindName('TxtExecutor').Text | Should -Be 'Alice'
+        $script:winER.FindName('TxtVerifier').Text | Should -Be 'Bob'
+    }
+
+    It 'TxtExecutor LostFocus writes back to the step' {
+        $script:winER.FindName('ExecChecklist').SelectedIndex = 0
+        $tb = $script:winER.FindName('TxtExecutor')
+        $tb.Text = 'NewExec'
+        # Fire LostFocus
+        $tb.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.TextBox]::LostFocusEvent))
+        $script:sessionER.Procedure.Steps[0].Executor | Should -Be 'NewExec'
     }
 }
 

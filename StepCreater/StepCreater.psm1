@@ -637,8 +637,6 @@ function Show-StepCreaterMainWindow {
             $c.TxtNote.Text     = ''
             $c.TxtAuthor.Text   = ''
             $c.TxtReviewer.Text = ''
-            $c.TxtExecutor.Text = ''
-            $c.TxtVerifier.Text = ''
             $c.CboStatus.SelectedIndex = -1
             $editorState.SuppressEdit = $false
             $editorState.CurrentStepIndex = -1
@@ -654,8 +652,6 @@ function Show-StepCreaterMainWindow {
         $c.TxtNote.Text     = $step.Note
         $c.TxtAuthor.Text   = $step.Author
         $c.TxtReviewer.Text = $step.Reviewer
-        $c.TxtExecutor.Text = $step.Executor
-        $c.TxtVerifier.Text = $step.Verifier
         $c.CboStatus.SelectedIndex = @('creating','reviewing','created','executing','verifying','ng','aborted','done').IndexOf($step.Status)
         $editorState.SuppressEdit = $false
         $editorState.CurrentStepIndex = $idx
@@ -673,8 +669,7 @@ function Show-StepCreaterMainWindow {
         $step.Note           = $c.TxtNote.Text
         $step.Author         = $c.TxtAuthor.Text
         $step.Reviewer       = $c.TxtReviewer.Text
-        $step.Executor       = $c.TxtExecutor.Text
-        $step.Verifier       = $c.TxtVerifier.Text
+        # Executor/Verifier are handled in Execute mode now
         if ($c.CboStatus.SelectedIndex -ge 0) {
             $step.Status = @('creating','reviewing','created','executing','verifying','ng','aborted','done')[$c.CboStatus.SelectedIndex]
         }
@@ -690,7 +685,7 @@ function Show-StepCreaterMainWindow {
     $c.StepList.Add_SelectionChanged({ & $loadStep $c.StepList.SelectedIndex }.GetNewClosure())
 
     foreach ($tb in @($c.TxtTitle, $c.TxtBody, $c.TxtCommand, $c.TxtExpected, $c.TxtNote,
-                      $c.TxtAuthor, $c.TxtReviewer, $c.TxtExecutor, $c.TxtVerifier)) {
+                      $c.TxtAuthor, $c.TxtReviewer)) {
         $tb.Add_LostFocus($saveEdits)
     }
     $c.CboStatus.Add_SelectionChanged($saveEdits)
@@ -862,6 +857,8 @@ function Show-StepCreaterMainWindow {
             $c.ExecBody.Text      = ''
             $c.ExecCommand.Text   = ''
             $c.ExecExpected.Text  = ''
+            $c.TxtExecutor.Text   = ''
+            $c.TxtVerifier.Text   = ''
             $c.ExecEvidenceTray.Children.Clear()
             $c.ExecProcImageTray.Children.Clear()
             return
@@ -871,10 +868,25 @@ function Show-StepCreaterMainWindow {
         $c.ExecBody.Text      = $step.BodyMarkdown
         $c.ExecCommand.Text   = $step.Command
         $c.ExecExpected.Text  = $step.ExpectedResult
+        $c.TxtExecutor.Text   = $step.Executor
+        $c.TxtVerifier.Text   = $step.Verifier
 
         Update-StepImageTray -Session $Session -StepIndex $idx -TrayPanel $c.ExecProcImageTray -Kind procedure -ReadOnly
         Update-StepImageTray -Session $Session -StepIndex $idx -TrayPanel $c.ExecEvidenceTray -Kind evidence -OnRemove $execEvidBox.OnRemove
     }.GetNewClosure()
+
+    $saveExecRoles = {
+        $idx = $c.ExecChecklist.SelectedIndex
+        if ($idx -lt 0) { return }
+        $step = $Session.Procedure.Steps[$idx]
+        $step.Executor = $c.TxtExecutor.Text
+        $step.Verifier = $c.TxtVerifier.Text
+        Save-WorkSession -Session $Session
+        $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+        Update-DirtyIndicator -Window $window
+    }.GetNewClosure()
+    $c.TxtExecutor.Add_LostFocus($saveExecRoles)
+    $c.TxtVerifier.Add_LostFocus($saveExecRoles)
 
     $applyMode = {
         param($mode)
