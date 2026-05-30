@@ -24,12 +24,14 @@
         $window = [Windows.Markup.XamlReader]::Load($reader)
 
         foreach ($name in @(
-            'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates','MenuSettings','MenuDashboard',
+            'MenuNew','MenuOpen','MenuSave','MenuExportHtmlCreate','MenuExportHtmlExec','MenuExit',
+            'MenuTemplates','MenuSettings','MenuProcInfo','MenuDashboard',
             'StatusText','DirtyText',
             'TabEdit','TabExecute','TabCapture',
             'WorkfolderPath','BtnSave',
             'StepList','BtnAdd','BtnDelete','BtnUp','BtnDown',
             'TxtTitle','CboStatus','TxtBody','TxtCommand','TxtExpected','TxtNote',
+            'TxtAuthor','TxtReviewer','TxtExecutor','TxtVerifier',
             'UnassignedTray',
             'EditPanel','ExecutePanel',
             'ProgressLabel','ExecChecklist',
@@ -86,6 +88,25 @@ Describe 'SettingsDialog.xaml' {
         $win = [Windows.Markup.XamlReader]::Load($reader)
         $win.GetType().Name | Should -Be 'Window'
         foreach ($n in @('TxtHkFull','TxtHkWindow','TxtHkRect','ChkAnnotation','BtnOk','BtnCancel')) {
+            $win.FindName($n) | Should -Not -BeNullOrEmpty
+        }
+    }
+}
+
+Describe 'ProcedureInfoDialog.xaml' {
+    BeforeAll {
+        Add-Type -AssemblyName PresentationFramework
+        $script:pidPath = Join-Path $PSScriptRoot '..\ui\ProcedureInfoDialog.xaml'
+    }
+
+    It 'file exists' { Test-Path $script:pidPath | Should -BeTrue }
+
+    It 'parses without error' {
+        $xml = [xml](Get-Content -LiteralPath $script:pidPath -Raw)
+        $reader = [System.Xml.XmlNodeReader]::new($xml)
+        $win = [Windows.Markup.XamlReader]::Load($reader)
+        $win.GetType().Name | Should -Be 'Window'
+        foreach ($n in @('TxtProcTitle','TxtDefAuthor','TxtDefReviewer','TxtDefExecutor','TxtDefVerifier','BtnOk','BtnCancel')) {
             $win.FindName($n) | Should -Not -BeNullOrEmpty
         }
     }

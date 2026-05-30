@@ -535,12 +535,14 @@ function Show-StepCreaterMainWindow {
 
     $c = @{}
     foreach ($name in @(
-        'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates','MenuSettings','MenuDashboard',
+        'MenuNew','MenuOpen','MenuSave','MenuExportHtmlCreate','MenuExportHtmlExec','MenuExit',
+        'MenuTemplates','MenuSettings','MenuProcInfo','MenuDashboard',
         'StatusText','DirtyText',
         'TabEdit','TabExecute','TabCapture',
         'WorkfolderPath','BtnSave',
         'StepList','BtnAdd','BtnDelete','BtnUp','BtnDown',
         'TxtTitle','CboStatus','TxtBody','TxtCommand','TxtExpected','TxtNote',
+        'TxtAuthor','TxtReviewer','TxtExecutor','TxtVerifier',
         'UnassignedTray',
         'EditPanel','ExecutePanel',
         'ProgressLabel','ExecChecklist',
@@ -633,6 +635,10 @@ function Show-StepCreaterMainWindow {
             $c.TxtCommand.Text  = ''
             $c.TxtExpected.Text = ''
             $c.TxtNote.Text     = ''
+            $c.TxtAuthor.Text   = ''
+            $c.TxtReviewer.Text = ''
+            $c.TxtExecutor.Text = ''
+            $c.TxtVerifier.Text = ''
             $c.CboStatus.SelectedIndex = -1
             $editorState.SuppressEdit = $false
             $editorState.CurrentStepIndex = -1
@@ -646,6 +652,10 @@ function Show-StepCreaterMainWindow {
         $c.TxtCommand.Text  = $step.Command
         $c.TxtExpected.Text = $step.ExpectedResult
         $c.TxtNote.Text     = $step.Note
+        $c.TxtAuthor.Text   = $step.Author
+        $c.TxtReviewer.Text = $step.Reviewer
+        $c.TxtExecutor.Text = $step.Executor
+        $c.TxtVerifier.Text = $step.Verifier
         $c.CboStatus.SelectedIndex = @('creating','reviewing','created','executing','verifying','ng','aborted','done').IndexOf($step.Status)
         $editorState.SuppressEdit = $false
         $editorState.CurrentStepIndex = $idx
@@ -661,6 +671,10 @@ function Show-StepCreaterMainWindow {
         $step.Command        = $c.TxtCommand.Text
         $step.ExpectedResult = $c.TxtExpected.Text
         $step.Note           = $c.TxtNote.Text
+        $step.Author         = $c.TxtAuthor.Text
+        $step.Reviewer       = $c.TxtReviewer.Text
+        $step.Executor       = $c.TxtExecutor.Text
+        $step.Verifier       = $c.TxtVerifier.Text
         if ($c.CboStatus.SelectedIndex -ge 0) {
             $step.Status = @('creating','reviewing','created','executing','verifying','ng','aborted','done')[$c.CboStatus.SelectedIndex]
         }
@@ -675,7 +689,8 @@ function Show-StepCreaterMainWindow {
 
     $c.StepList.Add_SelectionChanged({ & $loadStep $c.StepList.SelectedIndex }.GetNewClosure())
 
-    foreach ($tb in @($c.TxtTitle, $c.TxtBody, $c.TxtCommand, $c.TxtExpected, $c.TxtNote)) {
+    foreach ($tb in @($c.TxtTitle, $c.TxtBody, $c.TxtCommand, $c.TxtExpected, $c.TxtNote,
+                      $c.TxtAuthor, $c.TxtReviewer, $c.TxtExecutor, $c.TxtVerifier)) {
         $tb.Add_LostFocus($saveEdits)
     }
     $c.CboStatus.Add_SelectionChanged($saveEdits)
@@ -809,17 +824,20 @@ function Show-StepCreaterMainWindow {
     }
     $c.BtnSave.Add_Click($doSave.GetNewClosure())
     $c.MenuSave.Add_Click($doSave.GetNewClosure())
-    $c.MenuExportHtml.Add_Click({
+    $exportHtml = {
+        param($mode, $suffix)
         Save-WorkSession -Session $Session
-        $htmlPath = Join-Path $Session.WorkFolderPath 'procedure.html'
-        $html = ConvertTo-ProcedureHtml -Procedure $Session.Procedure
+        $htmlPath = Join-Path $Session.WorkFolderPath ("procedure_" + $suffix + ".html")
+        $html = ConvertTo-ProcedureHtml -Procedure $Session.Procedure -Mode $mode
         Set-Content -LiteralPath $htmlPath -Value $html -Encoding UTF8
         $c.StatusText.Text = "HTML出力: $htmlPath"
         $r = [System.Windows.MessageBox]::Show(
             "出力しました:`n$htmlPath`n`nブラウザで開きますか?",
             'HTML出力', 'YesNo', 'Information')
         if ($r -eq 'Yes') { Start-Process $htmlPath }
-    }.GetNewClosure())
+    }.GetNewClosure()
+    $c.MenuExportHtmlCreate.Add_Click({ & $exportHtml 'creation' 'create' }.GetNewClosure())
+    $c.MenuExportHtmlExec.Add_Click({   & $exportHtml 'execution' 'exec'  }.GetNewClosure())
     $c.MenuExit.Add_Click({ $window.Close() }.GetNewClosure())
 
     # Ctrl+S keyboard shortcut
@@ -1033,6 +1051,16 @@ function Show-StepCreaterMainWindow {
             $window.Tag.HotkeyHandle = $hk
         }
         $c.StatusText.Text = "設定を更新しました ($(Get-Date -Format HH:mm:ss))"
+    }.GetNewClosure())
+
+    $c.MenuProcInfo.Add_Click({
+        if (Show-ProcedureInfoDialog -Procedure $Session.Procedure -Owner $window) {
+            $window.Title = "StepCreater - $($Session.Procedure.Title)"
+            Save-WorkSession -Session $Session
+            $window.Tag.Baseline = Get-ProcedureHash -Procedure $Session.Procedure
+            Update-DirtyIndicator -Window $window
+            $c.StatusText.Text = "手順書情報を更新しました ($(Get-Date -Format HH:mm:ss))"
+        }
     }.GetNewClosure())
 
     $c.MenuDashboard.Add_Click({
@@ -1900,10 +1928,27 @@ function Get-StepDuration {
     return ('{0:D2}:{1:D2}:{2:D2}' -f $hours, $span.Minutes, $span.Seconds)
 }
 
+function Get-EffectiveRole {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)] [Step]$Step,
+        [Parameter(Mandatory)] [ProcedureDoc]$Procedure,
+        [Parameter(Mandatory)] [ValidateSet('Author','Reviewer','Executor','Verifier')] [string]$Role
+    )
+    $stepVal = $Step.$Role
+    if ($stepVal) { return $stepVal }
+    $defKey = 'Default' + $Role
+    return $Procedure.$defKey
+}
+
 function ConvertTo-ProcedureHtml {
     [CmdletBinding()]
     [OutputType([string])]
-    param([Parameter(Mandatory)] [ProcedureDoc]$Procedure)
+    param(
+        [Parameter(Mandatory)] [ProcedureDoc]$Procedure,
+        [Parameter()] [ValidateSet('execution','creation')] [string]$Mode = 'execution'
+    )
 
     $esc = {
         param($s)
@@ -1927,6 +1972,7 @@ body { font-family: "Segoe UI", "Yu Gothic UI", sans-serif; max-width: 1000px; m
 h1 { border-bottom: 2px solid #444; padding-bottom: 8px; }
 h2 { margin-top: 32px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
 .meta { color: #666; font-size: 0.9em; }
+.meta-roles { color: #555; font-size: 0.9em; margin-top: 4px; }
 .toc { background: #f7f7f7; padding: 12px 16px; border-radius: 4px; }
 .toc ol { margin: 4px 0; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.85em; margin-right: 8px; color: white; }
@@ -1944,6 +1990,7 @@ h2 { margin-top: 32px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
 pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Consolas, monospace; overflow-x: auto; }
 .evidence img { max-width: 320px; max-height: 240px; margin: 6px; cursor: zoom-in; border: 1px solid #ddd; }
 .procedure-images img { max-width: 320px; max-height: 240px; margin: 6px; cursor: zoom-in; border: 1px solid #ddd; }
+.status-history ul { margin: 4px 0; padding-left: 20px; }
 .lightbox { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 100; justify-content: center; align-items: center; cursor: zoom-out; }
 .lightbox.visible { display: flex; }
 .lightbox img { max-width: 95%; max-height: 95%; }
@@ -1984,10 +2031,21 @@ pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Conso
             'done'      { '完了' }
             default     { '不明' }
         }
-        $dur = Get-StepDuration -Step $step
 
         [void]$sb.AppendLine("<h2 id=`"step-$($step.Id)`">Step $($step.Id): $stTitle</h2>")
-        [void]$sb.AppendLine("<span class=`"$statusClass`">$statusLabel</span><span class=`"duration`">作業時間: $dur</span>")
+
+        if ($Mode -eq 'creation') {
+            [void]$sb.AppendLine("<span class=`"$statusClass`">$statusLabel</span>")
+            $author   = & $esc (Get-EffectiveRole -Step $step -Procedure $Procedure -Role Author)
+            $reviewer = & $esc (Get-EffectiveRole -Step $step -Procedure $Procedure -Role Reviewer)
+            [void]$sb.AppendLine("<div class=`"meta-roles`">作成者: <span>$author</span> | 確認者: <span>$reviewer</span></div>")
+        } else {
+            $dur = Get-StepDuration -Step $step
+            [void]$sb.AppendLine("<span class=`"$statusClass`">$statusLabel</span><span class=`"duration`">作業時間: $dur</span>")
+            $executor = & $esc (Get-EffectiveRole -Step $step -Procedure $Procedure -Role Executor)
+            $verifier = & $esc (Get-EffectiveRole -Step $step -Procedure $Procedure -Role Verifier)
+            [void]$sb.AppendLine("<div class=`"meta-roles`">実施者: <span>$executor</span> | 再鑑者: <span>$verifier</span></div>")
+        }
 
         if ($step.BodyMarkdown) {
             [void]$sb.AppendLine('<div class="section"><h3>手順</h3><div>' + (& $esc $step.BodyMarkdown) + '</div></div>')
@@ -2006,16 +2064,37 @@ pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Conso
         if ($step.ExpectedResult) {
             [void]$sb.AppendLine('<div class="section"><h3>想定結果</h3><div>' + (& $esc $step.ExpectedResult) + '</div></div>')
         }
-        if ($step.Evidence.Count -gt 0) {
-            [void]$sb.AppendLine('<div class="section evidence"><h3>エビデンス</h3><div>')
-            foreach ($ev in $step.Evidence) {
-                $src = & $esc ("images/" + (Get-ImageBareName $ev.FileName))
-                [void]$sb.AppendLine("<img src=`"$src`" alt=`"$src`" onclick=`"sc_lb(this.src)`">")
+        if ($Mode -eq 'execution') {
+            if ($step.Evidence.Count -gt 0) {
+                [void]$sb.AppendLine('<div class="section evidence"><h3>エビデンス</h3><div>')
+                foreach ($ev in $step.Evidence) {
+                    $src = & $esc ("images/" + (Get-ImageBareName $ev.FileName))
+                    [void]$sb.AppendLine("<img src=`"$src`" alt=`"$src`" onclick=`"sc_lb(this.src)`">")
+                }
+                [void]$sb.AppendLine('</div></div>')
             }
-            [void]$sb.AppendLine('</div></div>')
         }
         if ($step.Note) {
             [void]$sb.AppendLine('<div class="section"><h3>備考</h3><div>' + (& $esc $step.Note) + '</div></div>')
+        }
+        if ($Mode -eq 'execution' -and $step.StatusHistory -and $step.StatusHistory.Count -gt 0) {
+            [void]$sb.AppendLine('<div class="section status-history"><h3>履歴</h3><ul>')
+            foreach ($entry in $step.StatusHistory) {
+                $ts = ([datetime]$entry.At).ToString('s')
+                $entryLabel = switch ($entry.Status) {
+                    'creating'  { '作成中' }
+                    'reviewing' { '確認中' }
+                    'created'   { '作成済' }
+                    'executing' { '実施中' }
+                    'verifying' { '再鑑中' }
+                    'ng'        { '結果NG' }
+                    'aborted'   { '中止' }
+                    'done'      { '完了' }
+                    default     { & $esc $entry.Status }
+                }
+                [void]$sb.AppendLine("<li>$ts &mdash; $entryLabel</li>")
+            }
+            [void]$sb.AppendLine('</ul></div>')
         }
     }
 
@@ -2024,6 +2103,45 @@ pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Conso
     [void]$sb.AppendLine('</body></html>')
 
     return $sb.ToString()
+}
+
+function Show-ProcedureInfoDialog {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory)] [ProcedureDoc]$Procedure,
+        [Parameter()] $Owner
+    )
+    Add-Type -AssemblyName PresentationFramework
+
+    $xamlPath = Join-Path $PSScriptRoot 'ui/ProcedureInfoDialog.xaml'
+    $xml = [xml](Get-Content -LiteralPath $xamlPath -Raw)
+    $reader = [System.Xml.XmlNodeReader]::new($xml)
+    $win = [Windows.Markup.XamlReader]::Load($reader)
+    if ($Owner) { $win.Owner = $Owner }
+
+    $win.FindName('TxtProcTitle').Text   = $Procedure.Title
+    $win.FindName('TxtDefAuthor').Text   = $Procedure.DefaultAuthor
+    $win.FindName('TxtDefReviewer').Text = $Procedure.DefaultReviewer
+    $win.FindName('TxtDefExecutor').Text = $Procedure.DefaultExecutor
+    $win.FindName('TxtDefVerifier').Text = $Procedure.DefaultVerifier
+
+    $saved = [pscustomobject]@{ Ok = $false }
+    $win.FindName('BtnOk').Add_Click({
+        $Procedure.Title           = $win.FindName('TxtProcTitle').Text
+        $Procedure.DefaultAuthor   = $win.FindName('TxtDefAuthor').Text
+        $Procedure.DefaultReviewer = $win.FindName('TxtDefReviewer').Text
+        $Procedure.DefaultExecutor = $win.FindName('TxtDefExecutor').Text
+        $Procedure.DefaultVerifier = $win.FindName('TxtDefVerifier').Text
+        $saved.Ok = $true
+        $win.Close()
+    }.GetNewClosure())
+    $win.FindName('BtnCancel').Add_Click({ $win.Close() }.GetNewClosure())
+    $win.Add_KeyDown({
+        if ($_.Key -eq [System.Windows.Input.Key]::Escape) { $win.Close() }
+    }.GetNewClosure())
+    [void]$win.ShowDialog()
+    return $saved.Ok
 }
 
 function Show-SettingsDialog {

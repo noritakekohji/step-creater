@@ -9,11 +9,13 @@
                 <MenuItem x:Name="MenuOpen" Header="ワークフォルダを開く(_O)..." />
                 <Separator/>
                 <MenuItem x:Name="MenuSave" Header="保存(_S)" InputGestureText="Ctrl+S"/>
-                <MenuItem x:Name="MenuExportHtml" Header="HTML出力(_E)..."/>
+                    <MenuItem x:Name="MenuExportHtmlCreate" Header="HTML出力 作成版(_E)..."/>
+                <MenuItem x:Name="MenuExportHtmlExec"   Header="HTML出力 実施版..."/>
                 <Separator/>
                 <MenuItem x:Name="MenuExit" Header="終了(_X)"/>
             </MenuItem>
             <MenuItem x:Name="MenuTemplates" Header="テンプレ挿入(_T)"/>
+            <MenuItem x:Name="MenuProcInfo" Header="手順書情報(_I)..."/>
             <MenuItem x:Name="MenuSettings" Header="設定(_S)..."/>
             <MenuItem x:Name="MenuDashboard" Header="ダッシュボード(_D)..."/>
         </Menu>
@@ -80,6 +82,7 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0" Margin="0,0,0,8">
@@ -129,7 +132,30 @@
                                  VerticalScrollBarVisibility="Auto"/>
                     </GroupBox>
 
-                    <GroupBox Grid.Row="4" Header="手順画像" Margin="0,4,0,0" Height="120">
+                    <GroupBox Grid.Row="4" Header="役割 (空欄なら手順書の既定値が適用されます)" Margin="0,4,0,0">
+                        <Grid Margin="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="作成者:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="0" Grid.Column="1" x:Name="TxtAuthor"   Margin="0,0,12,4"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="確認者:" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <TextBox   Grid.Row="0" Grid.Column="3" x:Name="TxtReviewer" Margin="0,0,0,4"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="実施者:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox   Grid.Row="1" Grid.Column="1" x:Name="TxtExecutor" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="2" Text="再鑑者:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox   Grid.Row="1" Grid.Column="3" x:Name="TxtVerifier" Margin="0,0,0,0"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="5" Header="手順画像" Margin="0,4,0,0" Height="120">
                         <DockPanel>
                             <Button DockPanel.Dock="Right" x:Name="BtnAddEvidence"
                                     Content="+ 画像追加(ファイル)" Padding="8,4" Margin="4,4,4,4"

@@ -80,4 +80,70 @@ Describe 'ConvertTo-ProcedureHtml' {
         $html | Should -Match 'src="images/2026-05-27_103045_step01\.png"'
         $html | Should -Not -Match 'src="2026-05-27_103045_step01\.png"'
     }
+
+    It 'creation mode omits evidence sections' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('A')
+        $s.Evidence.Add([ScreenshotRef]::new('images/a.png', [datetime]'2026-05-27', 'full')) | Out-Null
+        $html = ConvertTo-ProcedureHtml -Procedure $doc -Mode creation
+        $html | Should -Not -Match 'section evidence'
+        $html | Should -Not -Match 'src="images/a\.png"'
+    }
+
+    It 'execution mode shows evidence' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('A')
+        $s.Evidence.Add([ScreenshotRef]::new('images/a.png', [datetime]'2026-05-27', 'full')) | Out-Null
+        $html = ConvertTo-ProcedureHtml -Procedure $doc -Mode execution
+        $html | Should -Match 'section evidence'
+    }
+
+    It 'execution mode shows status history when present' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('A')
+        $s.StatusHistory.Add([pscustomobject]@{Status='creating';At=[datetime]'2026-05-27T10:00:00';ChangedBy=''}) | Out-Null
+        $s.StatusHistory.Add([pscustomobject]@{Status='done';    At=[datetime]'2026-05-27T11:00:00';ChangedBy=''}) | Out-Null
+        $html = ConvertTo-ProcedureHtml -Procedure $doc -Mode execution
+        $html | Should -Match 'status-history'
+        $html | Should -Match '作成中'
+        $html | Should -Match '完了'
+    }
+
+    It 'creation mode shows author and reviewer' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $doc.DefaultAuthor = 'Alice'
+        $doc.DefaultReviewer = 'Bob'
+        $doc.AddStep('A') | Out-Null
+        $html = ConvertTo-ProcedureHtml -Procedure $doc -Mode creation
+        $html | Should -Match 'Alice'
+        $html | Should -Match 'Bob'
+    }
+
+    It 'creation mode omits working time duration span' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('A')
+        $s.Started  = [datetime]'2026-05-27T10:00:00'
+        $s.Finished = [datetime]'2026-05-27T10:05:23'
+        $html = ConvertTo-ProcedureHtml -Procedure $doc -Mode creation
+        $html | Should -Not -Match 'class="duration"'
+        $html | Should -Not -Match '00:05:23'
+    }
+}
+
+Describe 'Get-EffectiveRole' {
+    It 'returns the step override when set' {
+        $doc = [ProcedureDoc]::new('D'); $doc.DefaultAuthor = 'P'
+        $s = $doc.AddStep('A'); $s.Author = 'S'
+        Get-EffectiveRole -Step $s -Procedure $doc -Role Author | Should -Be 'S'
+    }
+    It 'falls back to procedure default' {
+        $doc = [ProcedureDoc]::new('D'); $doc.DefaultAuthor = 'P'
+        $s = $doc.AddStep('A')
+        Get-EffectiveRole -Step $s -Procedure $doc -Role Author | Should -Be 'P'
+    }
+    It 'returns empty when neither set' {
+        $doc = [ProcedureDoc]::new('D')
+        $s = $doc.AddStep('A')
+        Get-EffectiveRole -Step $s -Procedure $doc -Role Author | Should -Be ''
+    }
 }

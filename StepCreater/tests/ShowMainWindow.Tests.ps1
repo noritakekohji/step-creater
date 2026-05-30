@@ -216,6 +216,36 @@ Describe 'Template insertion menu' {
     }
 }
 
+Describe 'Edit mode role textboxes' {
+    BeforeEach {
+        $script:tmpR = Join-Path $TestDrive ("wf-role-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-StepCreaterWorkfolder -Path $script:tmpR -Title 'Role Test' | Out-Null
+        $script:sessionR = Open-StepCreaterWorkfolder -Path $script:tmpR
+        $s = $script:sessionR.Procedure.AddStep('Role Step')
+        $s.Author   = 'Alice'
+        $s.Reviewer = 'Bob'
+        $s.Executor = 'Carol'
+        $s.Verifier = 'Dave'
+        $script:winR = Show-StepCreaterMainWindow -Session $script:sessionR -NoShow
+    }
+
+    It 'loads role fields when step is selected' {
+        $script:winR.FindName('StepList').SelectedIndex = 0
+        $script:winR.FindName('TxtAuthor').Text   | Should -Be 'Alice'
+        $script:winR.FindName('TxtReviewer').Text | Should -Be 'Bob'
+        $script:winR.FindName('TxtExecutor').Text | Should -Be 'Carol'
+        $script:winR.FindName('TxtVerifier').Text | Should -Be 'Dave'
+    }
+
+    It 'TxtAuthor sync writes back to the Step' {
+        $script:winR.FindName('StepList').SelectedIndex = 0
+        $script:winR.FindName('TxtAuthor').Text = 'NewAuthor'
+        $script:winR.FindName('TxtAuthor').RaiseEvent(
+            [System.Windows.RoutedEventArgs]::new([System.Windows.UIElement]::LostFocusEvent))
+        $script:sessionR.Procedure.Steps[0].Author | Should -Be 'NewAuthor'
+    }
+}
+
 Describe 'Mode toggle (Edit/Execute)' {
     BeforeEach {
         $script:tmpM = Join-Path $TestDrive ("wf-mode-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
