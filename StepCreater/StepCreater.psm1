@@ -1911,25 +1911,32 @@ function Show-MaskEditor {
     $btnCancel   = $win.FindName('BtnCancel')
     $imageHost   = $win.FindName('ImageHost')
 
-    $current = Read-BitmapNoLock -Path $ImagePath
-    $history = New-Object System.Collections.Generic.Stack[System.Drawing.Bitmap]
-    $state   = [pscustomobject]@{ Down = $false; X0 = 0; Y0 = 0; Saved = $false }
+    # State held in a hashtable so closures see mutations across handlers.
+    # GetNewClosure() snapshots scalars at creation time — wrapping the working
+    # bitmap and undo stack in a hashtable lets every handler share the same
+    # mutable reference. Plain `$current = ...` reassignments would only update
+    # the local snapshot and the displayed image would never change.
+    $st = @{
+        Current = (Read-BitmapNoLock -Path $ImagePath)
+        History = (New-Object System.Collections.Generic.Stack[System.Drawing.Bitmap])
+    }
+    $state = [pscustomobject]@{ Down = $false; X0 = 0; Y0 = 0; Saved = $false }
 
     $refreshImage = {
         $ms = New-Object System.IO.MemoryStream
-        $current.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+        $st.Current.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
         $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
         $bmp.BeginInit()
         $bmp.StreamSource = $ms
         $bmp.CacheOption = 'OnLoad'
         $bmp.EndInit()
         $imgCanvas.Source = $bmp
-        $imgCanvas.Width  = $current.Width
-        $imgCanvas.Height = $current.Height
-        $imageHost.Width  = $current.Width
-        $imageHost.Height = $current.Height
-        $overlay.Width    = $current.Width
-        $overlay.Height   = $current.Height
+        $imgCanvas.Width  = $st.Current.Width
+        $imgCanvas.Height = $st.Current.Height
+        $imageHost.Width  = $st.Current.Width
+        $imageHost.Height = $st.Current.Height
+        $overlay.Width    = $st.Current.Width
+        $overlay.Height   = $st.Current.Height
     }.GetNewClosure()
     & $refreshImage
 
@@ -1963,34 +1970,40 @@ function Show-MaskEditor {
             ([int]$dragRect.Width), ([int]$dragRect.Height)
     }.GetNewClosure()
 
-    $applyOp = {
-        param($factory)
+    $btnBlackout.Add_Click({
         $rect = & $getRect
         if (-not $rect) { return }
-        $history.Push($current) | Out-Null
-        $current = & $factory $rect
+        $st.History.Push($st.Current) | Out-Null
+        $st.Current = Add-BlackoutRect -SourceBitmap $st.Current -Rect $rect
         & $refreshImage
         $dragRect.Visibility = 'Collapsed'
-    }.GetNewClosure()
+    }.GetNewClosure())
 
-    $btnBlackout.Add_Click({ & $applyOp { param($r) Add-BlackoutRect -SourceBitmap $current -Rect $r } }.GetNewClosure())
-    $btnFrame.Add_Click(   { & $applyOp { param($r) Add-FrameRect    -SourceBitmap $current -Rect $r } }.GetNewClosure())
-    $btnComment.Add_Click( {
+    $btnFrame.Add_Click({
+        $rect = & $getRect
+        if (-not $rect) { return }
+        $st.History.Push($st.Current) | Out-Null
+        $st.Current = Add-FrameRect -SourceBitmap $st.Current -Rect $rect
+        & $refreshImage
+        $dragRect.Visibility = 'Collapsed'
+    }.GetNewClosure())
+
+    $btnComment.Add_Click({
         $rect = & $getRect
         if (-not $rect) { return }
         Add-Type -AssemblyName Microsoft.VisualBasic
         $text = [Microsoft.VisualBasic.Interaction]::InputBox('コメントの本文を入力してください。', 'コメント挿入', '')
         if ($null -eq $text) { return }
-        $history.Push($current) | Out-Null
-        $current = Add-CommentRect -SourceBitmap $current -Rect $rect -Text $text
+        $st.History.Push($st.Current) | Out-Null
+        $st.Current = Add-CommentRect -SourceBitmap $st.Current -Rect $rect -Text $text
         & $refreshImage
         $dragRect.Visibility = 'Collapsed'
     }.GetNewClosure())
 
     $btnUndo.Add_Click({
-        if ($history.Count -gt 0) {
-            $current.Dispose()
-            $current = $history.Pop()
+        if ($st.History.Count -gt 0) {
+            $st.Current.Dispose()
+            $st.Current = $st.History.Pop()
             & $refreshImage
         }
     }.GetNewClosure())
@@ -2005,7 +2018,7 @@ function Show-MaskEditor {
         if (-not (Test-Path -LiteralPath $originalDest)) {
             Copy-Item -LiteralPath $ImagePath -Destination $originalDest -Force
         }
-        Save-BitmapPng -Bitmap $current -Path $ImagePath
+        Save-BitmapPng -Bitmap $st.Current -Path $ImagePath
         $state.Saved = $true
         $win.Close()
     }.GetNewClosure())
@@ -2018,8 +2031,8 @@ function Show-MaskEditor {
 
     [void]$win.ShowDialog()
 
-    foreach ($b in $history) { $b.Dispose() }
-    $current.Dispose()
+    foreach ($b in $st.History) { $b.Dispose() }
+    $st.Current.Dispose()
 
     return $state.Saved
 }
