@@ -86,4 +86,64 @@ Describe 'Write-Procedure (generator)' {
         $md = Write-Procedure -Procedure $doc
         $md | Should -Match '!\[\]\(images/cap1\.png\)'
     }
+
+    It 'emits ### 履歴 section when StatusHistory is non-empty' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('A')
+        $s.StatusHistory.Add([pscustomobject]@{ Status = 'creating';  At = [datetime]'2026-05-27T10:00:00'; ChangedBy = '' }) | Out-Null
+        $s.StatusHistory.Add([pscustomobject]@{ Status = 'reviewing'; At = [datetime]'2026-05-27T10:30:00'; ChangedBy = '' }) | Out-Null
+        $md = Write-Procedure -Procedure $doc
+        $md | Should -Match '### 履歴'
+        $md | Should -Match '2026-05-27T10:00:00 creating'
+        $md | Should -Match '2026-05-27T10:30:00 reviewing'
+    }
+
+    It 'omits ### 履歴 section when StatusHistory is empty' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $doc.AddStep('A') | Out-Null
+        $md = Write-Procedure -Procedure $doc
+        $md | Should -Not -Match '### 履歴'
+    }
+
+    It 'emits default* front matter keys when ProcedureDoc.Default* set' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $doc.DefaultAuthor   = 'Alice'
+        $doc.DefaultReviewer = 'Bob'
+        $doc.DefaultExecutor = 'Charlie'
+        $doc.DefaultVerifier = 'Dave'
+        $md = Write-Procedure -Procedure $doc
+        $md | Should -Match '(?m)^defaultAuthor: Alice$'
+        $md | Should -Match '(?m)^defaultReviewer: Bob$'
+        $md | Should -Match '(?m)^defaultExecutor: Charlie$'
+        $md | Should -Match '(?m)^defaultVerifier: Dave$'
+    }
+
+    It 'omits default* front matter keys when empty' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $md = Write-Procedure -Procedure $doc
+        $md | Should -Not -Match 'defaultAuthor'
+        $md | Should -Not -Match 'defaultReviewer'
+    }
+
+    It 'emits per-step role bullets when set' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $s = $doc.AddStep('A')
+        $s.Author   = 'Alice'
+        $s.Reviewer = 'Bob'
+        $s.Executor = 'Charlie'
+        $s.Verifier = 'Dave'
+        $md = Write-Procedure -Procedure $doc
+        $md | Should -Match '(?m)^- author: Alice$'
+        $md | Should -Match '(?m)^- reviewer: Bob$'
+        $md | Should -Match '(?m)^- executor: Charlie$'
+        $md | Should -Match '(?m)^- verifier: Dave$'
+    }
+
+    It 'omits per-step role bullets when empty' {
+        $doc = [ProcedureDoc]::new('Doc')
+        $doc.AddStep('A') | Out-Null
+        $md = Write-Procedure -Procedure $doc
+        $md | Should -Not -Match '(?m)^- author:'
+        $md | Should -Not -Match '(?m)^- reviewer:'
+    }
 }

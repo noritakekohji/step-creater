@@ -31,6 +31,11 @@ class Step {
     [System.Collections.Generic.List[ScreenshotRef]] $Evidence
     [System.Collections.Generic.List[ScreenshotRef]] $ProcedureImages
     [hashtable] $UnknownSectionsRaw
+    [string] $Author
+    [string] $Reviewer
+    [string] $Executor
+    [string] $Verifier
+    [System.Collections.Generic.List[object]] $StatusHistory
 
     Step([string]$id, [string]$title) {
         $this.Id                  = $id
@@ -38,11 +43,16 @@ class Step {
         $this.BodyMarkdown        = ''
         $this.Command             = ''
         $this.ExpectedResult      = ''
-        $this.Status              = 'pending'
+        $this.Status              = 'creating'
         $this.Note                = ''
         $this.Evidence            = [System.Collections.Generic.List[ScreenshotRef]]::new()
         $this.ProcedureImages     = [System.Collections.Generic.List[ScreenshotRef]]::new()
         $this.UnknownSectionsRaw  = @{}
+        $this.Author              = ''
+        $this.Reviewer            = ''
+        $this.Executor            = ''
+        $this.Verifier            = ''
+        $this.StatusHistory       = [System.Collections.Generic.List[object]]::new()
     }
 }
 
@@ -52,11 +62,19 @@ class ProcedureDoc {
     [Nullable[datetime]] $Created
     [Nullable[datetime]] $Updated
     [System.Collections.Generic.List[Step]] $Steps
+    [string] $DefaultAuthor
+    [string] $DefaultReviewer
+    [string] $DefaultExecutor
+    [string] $DefaultVerifier
 
     ProcedureDoc([string]$title) {
-        $this.Title  = $title
-        $this.Author = ''
-        $this.Steps  = [System.Collections.Generic.List[Step]]::new()
+        $this.Title           = $title
+        $this.Author          = ''
+        $this.Steps           = [System.Collections.Generic.List[Step]]::new()
+        $this.DefaultAuthor   = ''
+        $this.DefaultReviewer = ''
+        $this.DefaultExecutor = ''
+        $this.DefaultVerifier = ''
     }
 
     [Step] AddStep([string]$title) {
@@ -91,9 +109,13 @@ function Write-Procedure {
     # YAML front matter
     [void]$sb.Append("---$nl")
     [void]$sb.Append("title: $($Procedure.Title)$nl")
-    if ($Procedure.Author)  { [void]$sb.Append("author: $($Procedure.Author)$nl") }
-    if ($Procedure.Created) { [void]$sb.Append("created: $($Procedure.Created.ToString('yyyy-MM-dd'))$nl") }
-    if ($Procedure.Updated) { [void]$sb.Append("updated: $($Procedure.Updated.ToString('s'))$nl") }
+    if ($Procedure.Author)          { [void]$sb.Append("author: $($Procedure.Author)$nl") }
+    if ($Procedure.Created)         { [void]$sb.Append("created: $($Procedure.Created.ToString('yyyy-MM-dd'))$nl") }
+    if ($Procedure.Updated)         { [void]$sb.Append("updated: $($Procedure.Updated.ToString('s'))$nl") }
+    if ($Procedure.DefaultAuthor)   { [void]$sb.Append("defaultAuthor: $($Procedure.DefaultAuthor)$nl") }
+    if ($Procedure.DefaultReviewer) { [void]$sb.Append("defaultReviewer: $($Procedure.DefaultReviewer)$nl") }
+    if ($Procedure.DefaultExecutor) { [void]$sb.Append("defaultExecutor: $($Procedure.DefaultExecutor)$nl") }
+    if ($Procedure.DefaultVerifier) { [void]$sb.Append("defaultVerifier: $($Procedure.DefaultVerifier)$nl") }
     [void]$sb.Append("---$nl$nl")
 
     # H1 title
@@ -108,6 +130,10 @@ function Write-Procedure {
         [void]$sb.Append("- status: $($step.Status)$nl")
         if ($step.Started)  { [void]$sb.Append("- started: $($step.Started.ToString('s'))$nl") }
         if ($step.Finished) { [void]$sb.Append("- finished: $($step.Finished.ToString('s'))$nl") }
+        if ($step.Author)   { [void]$sb.Append("- author: $($step.Author)$nl") }
+        if ($step.Reviewer) { [void]$sb.Append("- reviewer: $($step.Reviewer)$nl") }
+        if ($step.Executor) { [void]$sb.Append("- executor: $($step.Executor)$nl") }
+        if ($step.Verifier) { [void]$sb.Append("- verifier: $($step.Verifier)$nl") }
         [void]$sb.Append($nl)
 
         if ($step.BodyMarkdown) {
@@ -151,6 +177,15 @@ function Write-Procedure {
             [void]$sb.Append("$nl$nl")
         }
 
+        if ($step.StatusHistory -and $step.StatusHistory.Count -gt 0) {
+            [void]$sb.Append("### 履歴$nl")
+            foreach ($entry in $step.StatusHistory) {
+                $ts = ([datetime]$entry.At).ToString('s')
+                [void]$sb.Append("- $ts $($entry.Status)$nl")
+            }
+            [void]$sb.Append($nl)
+        }
+
         foreach ($key in $step.UnknownSectionsRaw.Keys) {
             [void]$sb.Append("$key$nl")
             [void]$sb.Append($step.UnknownSectionsRaw[$key].TrimEnd())
@@ -182,7 +217,7 @@ function Read-Procedure {
     if ($lines.Count -gt 0 -and $lines[0] -eq '---') {
         $i = 1
         while ($i -lt $lines.Count -and $lines[$i] -ne '---') {
-            if ($lines[$i] -match '^(\w+):\s*(.+?)\s*$') {
+            if ($lines[$i] -match '^([\w]+):\s*(.+?)\s*$') {
                 $fm[$matches[1]] = $matches[2]
             }
             $i++
@@ -192,9 +227,13 @@ function Read-Procedure {
 
     $title = if ($fm.ContainsKey('title')) { $fm['title'] } else { '' }
     $doc = [ProcedureDoc]::new($title)
-    if ($fm.ContainsKey('author'))  { $doc.Author  = $fm['author'] }
-    if ($fm.ContainsKey('created')) { $doc.Created = [datetime]::Parse($fm['created']) }
-    if ($fm.ContainsKey('updated')) { $doc.Updated = [datetime]::Parse($fm['updated']) }
+    if ($fm.ContainsKey('author'))          { $doc.Author          = $fm['author'] }
+    if ($fm.ContainsKey('created'))         { $doc.Created         = [datetime]::Parse($fm['created']) }
+    if ($fm.ContainsKey('updated'))         { $doc.Updated         = [datetime]::Parse($fm['updated']) }
+    if ($fm.ContainsKey('defaultAuthor'))   { $doc.DefaultAuthor   = $fm['defaultAuthor'] }
+    if ($fm.ContainsKey('defaultReviewer')) { $doc.DefaultReviewer = $fm['defaultReviewer'] }
+    if ($fm.ContainsKey('defaultExecutor')) { $doc.DefaultExecutor = $fm['defaultExecutor'] }
+    if ($fm.ContainsKey('defaultVerifier')) { $doc.DefaultVerifier = $fm['defaultVerifier'] }
 
     # Split remainder by step headings ("## Step N: Title")
     $rest = ($lines[$i..($lines.Count - 1)]) -join "`n"
@@ -209,9 +248,28 @@ function Read-Procedure {
 
         $step = [Step]::new($id, $stepTitle)
 
-        if ($block -match '(?m)^- status:\s*(\S+)\s*$')   { $step.Status   = $matches[1] }
+        if ($block -match '(?m)^- status:\s*(\S+)\s*$') {
+            $rawStatus = $matches[1]
+            $step.Status = switch ($rawStatus) {
+                'pending' { 'creating' }
+                'done'    { 'done' }
+                'ng'      { 'ng' }
+                'skipped' { 'aborted' }
+                'creating'  { 'creating' }
+                'reviewing' { 'reviewing' }
+                'created'   { 'created' }
+                'executing' { 'executing' }
+                'verifying' { 'verifying' }
+                'aborted'   { 'aborted' }
+                default     { 'creating' }
+            }
+        }
         if ($block -match '(?m)^- started:\s*(\S+)\s*$')  { $step.Started  = [datetime]::Parse($matches[1]) }
         if ($block -match '(?m)^- finished:\s*(\S+)\s*$') { $step.Finished = [datetime]::Parse($matches[1]) }
+        if ($block -match '(?m)^- author:\s*(.+?)\s*$')   { $step.Author   = $matches[1] }
+        if ($block -match '(?m)^- reviewer:\s*(.+?)\s*$') { $step.Reviewer = $matches[1] }
+        if ($block -match '(?m)^- executor:\s*(.+?)\s*$') { $step.Executor = $matches[1] }
+        if ($block -match '(?m)^- verifier:\s*(.+?)\s*$') { $step.Verifier = $matches[1] }
 
         $sectionMatches = [regex]::Matches($block, '(?m)^### (.+?)\r?\n')
         for ($s = 0; $s -lt $sectionMatches.Count; $s++) {
@@ -242,6 +300,21 @@ function Read-Procedure {
                     }
                 }
                 '### 備考'         { $step.Note = $content }
+                '### 履歴'         {
+                    foreach ($line in ($content -split "`r?`n")) {
+                        if ($line -match '^-\s+(\S+)\s+(\S+)\s*$') {
+                            $entryAt     = $matches[1]
+                            $entryStatus = $matches[2]
+                            try {
+                                $step.StatusHistory.Add([pscustomobject]@{
+                                    Status    = $entryStatus
+                                    At        = [datetime]::Parse($entryAt)
+                                    ChangedBy = ''
+                                }) | Out-Null
+                            } catch { Write-Verbose "履歴 parse skip: $_" }
+                        }
+                    }
+                }
                 default            { $step.UnknownSectionsRaw[$heading] = $content }
             }
         }
@@ -573,7 +646,7 @@ function Show-StepCreaterMainWindow {
         $c.TxtCommand.Text  = $step.Command
         $c.TxtExpected.Text = $step.ExpectedResult
         $c.TxtNote.Text     = $step.Note
-        $c.CboStatus.SelectedIndex = @('pending','done','ng','skipped').IndexOf($step.Status)
+        $c.CboStatus.SelectedIndex = @('creating','reviewing','created','executing','verifying','ng','aborted','done').IndexOf($step.Status)
         $editorState.SuppressEdit = $false
         $editorState.CurrentStepIndex = $idx
         & $editProcBox.Refresh
@@ -589,7 +662,7 @@ function Show-StepCreaterMainWindow {
         $step.ExpectedResult = $c.TxtExpected.Text
         $step.Note           = $c.TxtNote.Text
         if ($c.CboStatus.SelectedIndex -ge 0) {
-            $step.Status = @('pending','done','ng','skipped')[$c.CboStatus.SelectedIndex]
+            $step.Status = @('creating','reviewing','created','executing','verifying','ng','aborted','done')[$c.CboStatus.SelectedIndex]
         }
         $savedIdx = $editorState.CurrentStepIndex
         Update-StepListUI -Session $Session -ListBox $c.StepList
@@ -839,7 +912,7 @@ function Show-StepCreaterMainWindow {
 
     $c.BtnComplete.Add_Click({ & $advanceTo 'done'    $true  }.GetNewClosure())
     $c.BtnNg.Add_Click({       & $advanceTo 'ng'      $false }.GetNewClosure())
-    $c.BtnSkip.Add_Click({     & $advanceTo 'skipped' $true  }.GetNewClosure())
+    $c.BtnSkip.Add_Click({     & $advanceTo 'aborted' $true  }.GetNewClosure())
 
     $confirmDiscard = {
         $current = Get-ProcedureHash -Procedure $Session.Procedure
@@ -1632,30 +1705,39 @@ function Get-ProgressLabel {
     [CmdletBinding()]
     [OutputType([string])]
     param([Parameter(Mandatory)] [ProcedureDoc]$Procedure)
-    $total = $Procedure.Steps.Count
+    $total   = $Procedure.Steps.Count
     $done    = (@($Procedure.Steps | Where-Object { $_.Status -eq 'done'    })).Count
     $ng      = (@($Procedure.Steps | Where-Object { $_.Status -eq 'ng'      })).Count
-    $skipped = (@($Procedure.Steps | Where-Object { $_.Status -eq 'skipped' })).Count
-    $touched = $done + $ng + $skipped
-    return ('進捗: {0} / {1} (完了 {2} / NG {3} / スキップ {4})' -f $touched, $total, $done, $ng, $skipped)
+    $aborted = (@($Procedure.Steps | Where-Object { $_.Status -eq 'aborted' })).Count
+    $touched = $done + $ng + $aborted
+    return ('進捗: {0} / {1} (完了 {2} / NG {3} / 中止 {4})' -f $touched, $total, $done, $ng, $aborted)
 }
 
 function Set-StepStatus {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [Step]$Step,
-        [Parameter(Mandatory)] [ValidateSet('pending','done','ng','skipped')] [string]$Status
+        [Parameter(Mandatory)] [ValidateSet('creating','reviewing','created','executing','verifying','ng','aborted','done')] [string]$Status
     )
     $now = Get-Date
-    if ($Status -eq 'pending') {
-        $Step.Status   = 'pending'
-        $Step.Started  = $null
-        $Step.Finished = $null
-        return
+    $Step.Status = $Status
+
+    # Append history entry on every explicit invocation
+    $Step.StatusHistory.Add([pscustomobject]@{
+        Status    = $Status
+        At        = $now
+        ChangedBy = ''
+    }) | Out-Null
+
+    # Set Started on first non-creating transition
+    if ($Status -ne 'creating' -and -not $Step.Started) {
+        $Step.Started = $now
     }
-    if (-not $Step.Started) { $Step.Started = $now }
-    $Step.Finished = $now
-    $Step.Status   = $Status
+
+    # Set Finished on terminal transitions
+    if ($Status -in 'done', 'ng', 'aborted') {
+        $Step.Finished = $now
+    }
 }
 
 function Update-ExecChecklistUI {
@@ -1670,7 +1752,7 @@ function Update-ExecChecklistUI {
         $mark = switch ($step.Status) {
             'done'    { '☑' }
             'ng'      { '⚠' }
-            'skipped' { '↷' }
+            'aborted' { '↷' }
             default   { '☐' }
         }
         [void]$ListBox.Items.Add(('{0} {1}: {2}' -f $mark, $step.Id, $step.Title))
@@ -1848,10 +1930,14 @@ h2 { margin-top: 32px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
 .toc { background: #f7f7f7; padding: 12px 16px; border-radius: 4px; }
 .toc ol { margin: 4px 0; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.85em; margin-right: 8px; color: white; }
-.badge-pending { background: #888; }
-.badge-done    { background: #28a745; }
-.badge-ng      { background: #dc3545; }
-.badge-skipped { background: #ffc107; color: #222; }
+.badge-creating  { background: #888; }
+.badge-reviewing { background: #17a2b8; }
+.badge-created   { background: #6f42c1; }
+.badge-executing { background: #fd7e14; }
+.badge-verifying { background: #20c997; }
+.badge-ng        { background: #dc3545; }
+.badge-aborted   { background: #ffc107; color: #222; }
+.badge-done      { background: #28a745; }
 .duration { color: #555; font-size: 0.9em; margin-left: 8px; }
 .section { margin-top: 12px; }
 .section h3 { margin: 8px 0 4px; font-size: 1em; color: #555; }
@@ -1888,10 +1974,15 @@ pre { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: Conso
         $stTitle = & $esc $step.Title
         $statusClass = "badge badge-" + $step.Status
         $statusLabel = switch ($step.Status) {
-            'done'    { '完了' }
-            'ng'      { 'NG' }
-            'skipped' { 'スキップ' }
-            default   { '未実施' }
+            'creating'  { '作成中' }
+            'reviewing' { '確認中' }
+            'created'   { '作成済' }
+            'executing' { '実施中' }
+            'verifying' { '再鑑中' }
+            'ng'        { '結果NG' }
+            'aborted'   { '中止' }
+            'done'      { '完了' }
+            default     { '不明' }
         }
         $dur = Get-StepDuration -Step $step
 

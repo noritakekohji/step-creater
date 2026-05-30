@@ -42,6 +42,21 @@ Describe 'Get-DashboardRows' {
         $rowB.Duration       | Should -Be '-'
     }
 
+    It 'includes a row with creating status step' {
+        $root2 = Join-Path $TestDrive ("dash2-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-Item -ItemType Directory -Path $root2 | Out-Null
+        $c = Join-Path $root2 'C'
+        New-StepCreaterWorkfolder -Path $c -Title 'Proc C' | Out-Null
+        $sessC = Open-StepCreaterWorkfolder -Path $c
+        $sessC.Procedure.AddStep('Init') | Out-Null
+        # Default status is creating — no explicit set needed
+        Save-WorkSession -Session $sessC
+
+        $rows = @(Get-DashboardRows -ParentFolder $root2)
+        $rows.Count | Should -Be 1
+        $rows[0].Status | Should -Be 'creating'
+    }
+
     It 'throws if parent folder does not exist' {
         { Get-DashboardRows -ParentFolder 'C:\does\not\exist\nope' } | Should -Throw
     }

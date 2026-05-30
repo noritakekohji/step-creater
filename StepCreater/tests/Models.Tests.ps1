@@ -10,11 +10,11 @@ Describe 'ScreenshotRef' {
 }
 
 Describe 'Step' {
-    It 'defaults to pending status with empty fields' {
+    It 'defaults to creating status with empty fields' {
         $step = [Step]::new('01', 'IIS Install')
         $step.Id              | Should -Be '01'
         $step.Title           | Should -Be 'IIS Install'
-        $step.Status          | Should -Be 'pending'
+        $step.Status          | Should -Be 'creating'
         $step.BodyMarkdown    | Should -Be ''
         $step.Command         | Should -Be ''
         $step.ExpectedResult  | Should -Be ''
@@ -23,14 +23,23 @@ Describe 'Step' {
         $step.ProcedureImages.Count | Should -Be 0
         $step.Started         | Should -BeNullOrEmpty
         $step.Finished        | Should -BeNullOrEmpty
+        $step.Author          | Should -Be ''
+        $step.Reviewer        | Should -Be ''
+        $step.Executor        | Should -Be ''
+        $step.Verifier        | Should -Be ''
+        $step.StatusHistory.Count | Should -Be 0
     }
 }
 
 Describe 'ProcedureDoc' {
     It 'has empty Steps list by default' {
         $doc = [ProcedureDoc]::new('Server Build')
-        $doc.Title       | Should -Be 'Server Build'
-        $doc.Steps.Count | Should -Be 0
+        $doc.Title            | Should -Be 'Server Build'
+        $doc.Steps.Count      | Should -Be 0
+        $doc.DefaultAuthor    | Should -Be ''
+        $doc.DefaultReviewer  | Should -Be ''
+        $doc.DefaultExecutor  | Should -Be ''
+        $doc.DefaultVerifier  | Should -Be ''
     }
 
     It 'AddStep assigns sequential zero-padded IDs' {

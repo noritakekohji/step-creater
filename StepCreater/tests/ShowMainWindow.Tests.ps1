@@ -278,11 +278,11 @@ Describe 'Execute mode buttons' {
         $script:winE.FindName('ExecChecklist').SelectedIndex | Should -Be 1
     }
 
-    It 'BtnSkip sets skipped and advances' {
+    It 'BtnSkip sets aborted and advances' {
         $script:winE.FindName('ExecChecklist').SelectedIndex = 0
         $btn = $script:winE.FindName('BtnSkip')
         $btn.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Button]::ClickEvent))
-        $script:sessionE.Procedure.Steps[0].Status | Should -Be 'skipped'
+        $script:sessionE.Procedure.Steps[0].Status | Should -Be 'aborted'
         $script:winE.FindName('ExecChecklist').SelectedIndex | Should -Be 1
     }
 

@@ -16,7 +16,7 @@ Describe 'ConvertTo-ProcedureHtml' {
         $a.Evidence.Add([ScreenshotRef]::new('images/a.png', [datetime]'2026-05-27', 'full')) | Out-Null
 
         $b = $script:doc.AddStep('Configure')
-        $b.Status = 'pending'
+        $b.Status = 'creating'
 
         $script:html = ConvertTo-ProcedureHtml -Procedure $script:doc
     }
@@ -37,7 +37,7 @@ Describe 'ConvertTo-ProcedureHtml' {
 
     It 'shows status badges' {
         $script:html | Should -Match 'badge-done'
-        $script:html | Should -Match 'badge-pending'
+        $script:html | Should -Match 'badge-creating'
     }
 
     It 'shows working time for completed steps' {

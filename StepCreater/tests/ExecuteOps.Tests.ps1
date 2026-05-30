@@ -15,12 +15,21 @@ Describe 'Set-StepStatus' {
         $script:step.Started  | Should -BeGreaterOrEqual $before
     }
 
-    It 'resets Started and Finished to null on pending' {
+    It 'appends history entry on each call' {
+        Set-StepStatus -Step $script:step -Status 'executing'
+        $script:step.StatusHistory.Count | Should -Be 1
+        $script:step.StatusHistory[0].Status | Should -Be 'executing'
         Set-StepStatus -Step $script:step -Status 'done'
-        Set-StepStatus -Step $script:step -Status 'pending'
-        $script:step.Status   | Should -Be 'pending'
+        $script:step.StatusHistory.Count | Should -Be 2
+        $script:step.StatusHistory[1].Status | Should -Be 'done'
+    }
+
+    It 'sets creating and appends history but does not set Started/Finished' {
+        Set-StepStatus -Step $script:step -Status 'creating'
+        $script:step.Status   | Should -Be 'creating'
         $script:step.Started  | Should -BeNullOrEmpty
         $script:step.Finished | Should -BeNullOrEmpty
+        $script:step.StatusHistory.Count | Should -Be 1
     }
 
     It 'preserves prior Started time on subsequent terminal transitions' {
@@ -36,7 +45,18 @@ Describe 'Set-StepStatus' {
         Set-StepStatus -Step $script:step -Status 'done'
         $firstFinish = $script:step.Finished
         Start-Sleep -Milliseconds 20
-        Set-StepStatus -Step $script:step -Status 'skipped'
+        Set-StepStatus -Step $script:step -Status 'aborted'
         $script:step.Finished | Should -BeGreaterThan $firstFinish
+    }
+
+    It 'sets Started on first non-creating transition' {
+        Set-StepStatus -Step $script:step -Status 'reviewing'
+        $script:step.Started  | Should -Not -BeNullOrEmpty
+        $script:step.Finished | Should -BeNullOrEmpty
+    }
+
+    It 'sets Finished on aborted transition' {
+        Set-StepStatus -Step $script:step -Status 'aborted'
+        $script:step.Finished | Should -Not -BeNullOrEmpty
     }
 }

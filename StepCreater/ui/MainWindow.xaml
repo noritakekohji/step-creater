@@ -93,10 +93,14 @@
                         <TextBox  Grid.Column="1" x:Name="TxtTitle"/>
                         <TextBlock Grid.Column="2" Text="ステータス:" VerticalAlignment="Center" Margin="16,0,8,0"/>
                         <ComboBox Grid.Column="3" x:Name="CboStatus">
-                            <ComboBoxItem Content="pending"/>
-                            <ComboBoxItem Content="done"/>
+                            <ComboBoxItem Content="creating"/>
+                            <ComboBoxItem Content="reviewing"/>
+                            <ComboBoxItem Content="created"/>
+                            <ComboBoxItem Content="executing"/>
+                            <ComboBoxItem Content="verifying"/>
                             <ComboBoxItem Content="ng"/>
-                            <ComboBoxItem Content="skipped"/>
+                            <ComboBoxItem Content="aborted"/>
+                            <ComboBoxItem Content="done"/>
                         </ComboBox>
                     </Grid>
 

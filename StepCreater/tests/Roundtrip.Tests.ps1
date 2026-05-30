@@ -44,4 +44,59 @@ Describe 'Markdown round-trip' {
 
         Remove-Item $tmp.FullName -Force
     }
+
+    It 'round-trips roles and StatusHistory' {
+        $doc = [ProcedureDoc]::new('Roles Doc')
+        $a = $doc.AddStep('A')
+        $a.Status   = 'done'
+        $a.Author   = 'Alice'
+        $a.Reviewer = 'Bob'
+        $a.Executor = 'Charlie'
+        $a.Verifier = 'Dave'
+        $a.StatusHistory.Add([pscustomobject]@{
+            Status    = 'creating'
+            At        = [datetime]'2026-05-27T09:00:00'
+            ChangedBy = ''
+        }) | Out-Null
+        $a.StatusHistory.Add([pscustomobject]@{
+            Status    = 'done'
+            At        = [datetime]'2026-05-27T10:00:00'
+            ChangedBy = ''
+        }) | Out-Null
+
+        $md = Write-Procedure -Procedure $doc
+        $tmp = New-TemporaryFile
+        Set-Content -LiteralPath $tmp.FullName -Value $md -Encoding UTF8
+        $parsed = Read-Procedure -Path $tmp.FullName
+        Remove-Item $tmp.FullName -Force
+
+        $p = $parsed.Steps[0]
+        $p.Author   | Should -Be 'Alice'
+        $p.Reviewer | Should -Be 'Bob'
+        $p.Executor | Should -Be 'Charlie'
+        $p.Verifier | Should -Be 'Dave'
+        $p.StatusHistory.Count          | Should -Be 2
+        $p.StatusHistory[0].Status      | Should -Be 'creating'
+        $p.StatusHistory[0].At          | Should -Be ([datetime]'2026-05-27T09:00:00')
+        $p.StatusHistory[1].Status      | Should -Be 'done'
+    }
+
+    It 'round-trips ProcedureDoc Default* fields' {
+        $doc = [ProcedureDoc]::new('Defaults Doc')
+        $doc.DefaultAuthor   = 'Alice'
+        $doc.DefaultReviewer = 'Bob'
+        $doc.DefaultExecutor = 'Charlie'
+        $doc.DefaultVerifier = 'Dave'
+
+        $md = Write-Procedure -Procedure $doc
+        $tmp = New-TemporaryFile
+        Set-Content -LiteralPath $tmp.FullName -Value $md -Encoding UTF8
+        $parsed = Read-Procedure -Path $tmp.FullName
+        Remove-Item $tmp.FullName -Force
+
+        $parsed.DefaultAuthor   | Should -Be 'Alice'
+        $parsed.DefaultReviewer | Should -Be 'Bob'
+        $parsed.DefaultExecutor | Should -Be 'Charlie'
+        $parsed.DefaultVerifier | Should -Be 'Dave'
+    }
 }
