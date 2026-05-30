@@ -111,3 +111,33 @@ Describe 'ProcedureInfoDialog.xaml' {
         }
     }
 }
+
+Describe 'MaskEditor.xaml' {
+    BeforeAll {
+        Add-Type -AssemblyName PresentationFramework
+        Add-Type -AssemblyName PresentationCore
+        Add-Type -AssemblyName WindowsBase
+        $script:mePath = Join-Path $PSScriptRoot '..\ui\MaskEditor.xaml'
+    }
+
+    It 'file exists' { Test-Path $script:mePath | Should -BeTrue }
+
+    It 'parses without error and produces a Window' {
+        $xml = [xml](Get-Content -LiteralPath $script:mePath -Raw)
+        $reader = [System.Xml.XmlNodeReader]::new($xml)
+        $win = [Windows.Markup.XamlReader]::Load($reader)
+        $win | Should -Not -BeNullOrEmpty
+        $win.GetType().Name | Should -Be 'Window'
+    }
+
+    It 'has all expected named controls' {
+        $xml = [xml](Get-Content -LiteralPath $script:mePath -Raw)
+        $reader = [System.Xml.XmlNodeReader]::new($xml)
+        $win = [Windows.Markup.XamlReader]::Load($reader)
+        foreach ($n in @('ImgCanvas','OverlayCanvas','DragRect',
+                         'BtnAddRect','BtnAddCallout','BtnUndo','BtnSave','BtnCancel',
+                         'ImageHost','ImageScroller')) {
+            $win.FindName($n) | Should -Not -BeNullOrEmpty -Because "$n should exist in MaskEditor.xaml"
+        }
+    }
+}

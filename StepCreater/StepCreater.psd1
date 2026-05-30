@@ -41,6 +41,7 @@
         'Update-ExecChecklistUI',
         'Set-StepStatus',
         'Add-BlackoutRect',
+        'Add-FrameWithCallout',
         'Show-MaskEditor',
         'Get-StepDuration',
         'Get-EffectiveRole',

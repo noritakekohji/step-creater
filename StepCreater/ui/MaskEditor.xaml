@@ -4,21 +4,24 @@
         WindowStartupLocation="CenterScreen">
     <DockPanel>
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8">
-            <TextBlock VerticalAlignment="Center" Text="ドラッグで矩形を描画 → [追加] で黒塗り。[戻す] で1つ戻す。[保存] で確定。"
-                       Foreground="DimGray"/>
+            <TextBlock VerticalAlignment="Center" Foreground="DimGray"
+                       Text="ドラッグで矩形を描画 → [黒塗り] か [枚＋吹き出し] → [保存]"/>
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="8">
-            <Button x:Name="BtnAddRect" Content="追加"   Padding="12,4" Margin="0,0,4,0"/>
-            <Button x:Name="BtnUndo"    Content="戻す"   Padding="12,4" Margin="0,0,4,0"/>
-            <Button x:Name="BtnSave"    Content="保存"   Padding="12,4" Margin="0,0,4,0"/>
-            <Button x:Name="BtnCancel"  Content="キャンセル" Padding="12,4"/>
+            <Button x:Name="BtnAddRect"     Content="黒塗り"       Padding="12,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnAddCallout"  Content="枚+吹き出し" Padding="12,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnUndo"        Content="戻す"        Padding="12,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnSave"        Content="保存"        Padding="12,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnCancel"      Content="キャンセル"  Padding="12,4"/>
         </StackPanel>
-        <Grid>
-            <Image x:Name="ImgCanvas" Stretch="None"/>
-            <Canvas x:Name="OverlayCanvas" Background="Transparent">
-                <Rectangle x:Name="DragRect" Stroke="Red" StrokeThickness="2"
-                           Fill="#33FF0000" Visibility="Collapsed"/>
-            </Canvas>
-        </Grid>
+        <ScrollViewer x:Name="ImageScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Grid x:Name="ImageHost" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Image  x:Name="ImgCanvas" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                <Canvas x:Name="OverlayCanvas" Background="Transparent" HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <Rectangle x:Name="DragRect" Stroke="Red" StrokeThickness="2"
+                               Fill="#33FF0000" Visibility="Collapsed"/>
+                </Canvas>
+            </Grid>
+        </ScrollViewer>
     </DockPanel>
 </Window>
