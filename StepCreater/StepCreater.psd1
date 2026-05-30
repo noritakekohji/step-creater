@@ -14,6 +14,7 @@
         'Get-StepCreaterConfig',
         'Set-StepCreaterConfig',
         'Get-StepTemplates',
+        'Get-UserTemplateFolder',
         'Add-ProcedureStepAt',
         'Remove-ProcedureStep',
         'Move-ProcedureStep',

@@ -443,19 +443,52 @@ function Set-StepCreaterConfig {
     Set-Content -LiteralPath $path -Value $json -Encoding UTF8
 }
 
+function Get-UserTemplateFolder {
+    <#
+    .SYNOPSIS
+      Returns the per-user template folder path under %APPDATA%\StepCreater\templates.
+      Honors the STEPCREATER_CONFIG_DIR override so tests can isolate it.
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param()
+    $base = if ($env:STEPCREATER_CONFIG_DIR) { $env:STEPCREATER_CONFIG_DIR }
+            else { Join-Path $env:APPDATA 'StepCreater' }
+    return (Join-Path $base 'templates')
+}
+
 function Get-StepTemplates {
+    <#
+    .SYNOPSIS
+      Loads step templates from both the bundled ui/templates folder and the
+      user-writable %APPDATA%\StepCreater\templates folder. User templates with
+      the same Name override bundled ones, so users can customize without losing
+      changes on reinstall.
+    #>
     [CmdletBinding()]
     [OutputType([System.Collections.Generic.List[object]])]
     param()
 
-    $dir = Join-Path $PSScriptRoot 'ui/templates'
-    $list = [System.Collections.Generic.List[object]]::new()
-    if (-not (Test-Path -LiteralPath $dir)) { return $list }
+    $byName = [ordered]@{}
+    $bundled = Join-Path $PSScriptRoot 'ui/templates'
+    $user    = Get-UserTemplateFolder
 
-    Get-ChildItem -LiteralPath $dir -Filter '*.psd1' | ForEach-Object {
-        $data = Import-PowerShellDataFile -LiteralPath $_.FullName
-        $list.Add([pscustomobject]$data) | Out-Null
+    foreach ($dir in @($bundled, $user)) {
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        Get-ChildItem -LiteralPath $dir -Filter '*.psd1' -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $data = Import-PowerShellDataFile -LiteralPath $_.FullName
+                $obj = [pscustomobject]$data
+                $key = if ($obj.PSObject.Properties['Name'] -and $obj.Name) { $obj.Name } else { $_.BaseName }
+                $byName[$key] = $obj
+            } catch {
+                Write-Warning "Template file '$($_.FullName)' is invalid: $($_.Exception.Message)"
+            }
+        }
     }
+
+    $list = [System.Collections.Generic.List[object]]::new()
+    foreach ($k in $byName.Keys) { $list.Add($byName[$k]) | Out-Null }
     return $list
 }
 
@@ -536,7 +569,7 @@ function Show-StepCreaterMainWindow {
     $c = @{}
     foreach ($name in @(
         'MenuNew','MenuOpen','MenuSave','MenuExportHtmlCreate','MenuExportHtmlExec','MenuCsvImport','MenuCsvSampleSave','MenuExit',
-        'MenuTemplates','MenuSettings','MenuProcInfo','MenuDashboard',
+        'MenuTemplates','MenuOpenTemplatesDir','MenuSettings','MenuProcInfo','MenuDashboard',
         'StatusText','DirtyText',
         'TabEdit','TabExecute','TabCapture',
         'WorkfolderPath','BtnSave',
@@ -1104,6 +1137,56 @@ function Show-StepCreaterMainWindow {
             $window.Tag.HotkeyHandle = $hk
         }
         $c.StatusText.Text = "設定を更新しました ($(Get-Date -Format HH:mm:ss))"
+    }.GetNewClosure())
+
+    $c.MenuOpenTemplatesDir.Add_Click({
+        $userDir   = Get-UserTemplateFolder
+        $bundleDir = Join-Path $PSScriptRoot 'ui/templates'
+        if (-not (Test-Path -LiteralPath $userDir)) {
+            New-Item -ItemType Directory -Path $userDir -Force | Out-Null
+        }
+        # Seed README + sample on first open so the format is discoverable
+        $readme = Join-Path $userDir 'README.txt'
+        if (-not (Test-Path -LiteralPath $readme)) {
+            $readmeText = @"
+このフォルダにテンプレートを追加すると、テンプレ挿入メニューに自動で表示されます。
+- 拡張子: .psd1
+- エンコーディング: UTF-8 (BOM 付き推奨)
+- 1ファイル=1テンプレート
+- 同名 (Name) のバンドルテンプレートがあるとユーザー側が優先されます
+
+ファイル形式:
+@{
+    Name           = '表示名'
+    Title          = '挿入される Step タイトル'
+    BodyMarkdown   = '本文 (Markdown)'
+    Command        = '実行コマンド'
+    ExpectedResult = '想定結果'
+    Note           = '備考'
+}
+
+バンドル済みサンプル: $bundleDir
+"@
+            $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+            [System.IO.File]::WriteAllText($readme, $readmeText, $utf8Bom)
+        }
+        $sample = Join-Path $userDir 'sample.psd1'
+        if (-not (Test-Path -LiteralPath $sample)) {
+            $sampleText = @"
+@{
+    Name           = 'My Sample'
+    Title          = 'サンプル手順'
+    BodyMarkdown   = 'ここに本文を書きます。'
+    Command        = 'Write-Host hello'
+    ExpectedResult = '"hello" と表示される'
+    Note           = '備考欄'
+}
+"@
+            $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+            [System.IO.File]::WriteAllText($sample, $sampleText, $utf8Bom)
+        }
+        Start-Process explorer.exe -ArgumentList "`"$userDir`""
+        $c.StatusText.Text = "テンプレートフォルダを開きました: $userDir (編集後、アプリを再起動)"
     }.GetNewClosure())
 
     $c.MenuProcInfo.Add_Click({

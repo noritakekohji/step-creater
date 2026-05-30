@@ -17,7 +17,11 @@
                 <Separator/>
                 <MenuItem x:Name="MenuExit" Header="終了(_X)"/>
             </MenuItem>
-            <MenuItem x:Name="MenuTemplates" Header="テンプレ挿入(_T)"/>
+            <MenuItem Header="テンプレ(_T)">
+                <MenuItem x:Name="MenuTemplates"       Header="挿入"/>
+                <Separator/>
+                <MenuItem x:Name="MenuOpenTemplatesDir" Header="テンプレートフォルダを開く"/>
+            </MenuItem>
             <MenuItem x:Name="MenuProcInfo" Header="手順書情報(_I)..."/>
             <MenuItem x:Name="MenuSettings" Header="設定(_S)..."/>
             <MenuItem x:Name="MenuDashboard" Header="ダッシュボード(_D)..."/>
