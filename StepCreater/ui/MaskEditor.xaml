@@ -5,14 +5,15 @@
     <DockPanel>
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8">
             <TextBlock VerticalAlignment="Center" Foreground="DimGray"
-                       Text="ドラッグで矩形を描画 → [黒塗り] か [枚＋吹き出し] → [保存]"/>
+                       Text="ドラッグで矩形を描画 → [黒塗り] / [枠] / [コメント挿入] → [保存]"/>
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="8">
-            <Button x:Name="BtnAddRect"     Content="黒塗り"       Padding="12,4" Margin="0,0,4,0"/>
-            <Button x:Name="BtnAddCallout"  Content="枚+吹き出し" Padding="12,4" Margin="0,0,4,0"/>
-            <Button x:Name="BtnUndo"        Content="戻す"        Padding="12,4" Margin="0,0,4,0"/>
-            <Button x:Name="BtnSave"        Content="保存"        Padding="12,4" Margin="0,0,4,0"/>
-            <Button x:Name="BtnCancel"      Content="キャンセル"  Padding="12,4"/>
+            <Button x:Name="BtnBlackout" Content="黒塗り"       Padding="12,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnFrame"    Content="枠"           Padding="12,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnComment"  Content="コメント挿入" Padding="12,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnUndo"     Content="戻す"        Padding="12,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnSave"     Content="保存"        Padding="12,4" Margin="0,0,4,0"/>
+            <Button x:Name="BtnCancel"   Content="キャンセル"  Padding="12,4"/>
         </StackPanel>
         <ScrollViewer x:Name="ImageScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <Grid x:Name="ImageHost" HorizontalAlignment="Left" VerticalAlignment="Top">

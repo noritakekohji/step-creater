@@ -1816,11 +1816,32 @@ function Add-BlackoutRect {
     return $out
 }
 
-function Add-FrameWithCallout {
+function Add-FrameRect {
     <#
     .SYNOPSIS
-      Draws a red rectangle frame around the given Rect and writes a callout text
-      block above-right of the rectangle, joined by a thin leader line.
+      Draws a red rectangle outline at the given Rect on a copy of the bitmap.
+    #>
+    [CmdletBinding()]
+    [OutputType([System.Drawing.Bitmap])]
+    param(
+        [Parameter(Mandatory)] [System.Drawing.Bitmap]$SourceBitmap,
+        [Parameter(Mandatory)] [System.Drawing.Rectangle]$Rect
+    )
+    Add-Type -AssemblyName System.Drawing
+    $out = New-Object System.Drawing.Bitmap $SourceBitmap
+    $g = [System.Drawing.Graphics]::FromImage($out)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 220, 30, 30)), 3
+    try { $g.DrawRectangle($pen, $Rect) }
+    finally { $pen.Dispose(); $g.Dispose() }
+    return $out
+}
+
+function Add-CommentRect {
+    <#
+    .SYNOPSIS
+      Draws a light-yellow rounded text box at the given Rect with a red border.
+      The supplied text is wrapped and drawn inside the rectangle.
     #>
     [CmdletBinding()]
     [OutputType([System.Drawing.Bitmap])]
@@ -1835,55 +1856,28 @@ function Add-FrameWithCallout {
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
 
-    $pen      = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 220, 30, 30)), 3
-    $line     = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 220, 30, 30)), 2
-    $bgBrush  = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(230, 255, 255, 220))
-    $fgBrush  = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::Black)
-    $font     = New-Object System.Drawing.Font 'Yu Gothic UI', 11, ([System.Drawing.FontStyle]::Regular)
-
+    $bg     = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(235, 255, 255, 220))
+    $fg     = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::Black)
+    $pen    = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 220, 30, 30)), 2
+    $font   = New-Object System.Drawing.Font 'Yu Gothic UI', 11, ([System.Drawing.FontStyle]::Regular)
+    $format = New-Object System.Drawing.StringFormat
+    $format.Alignment     = [System.Drawing.StringAlignment]::Near
+    $format.LineAlignment = [System.Drawing.StringAlignment]::Near
     try {
-        # Frame
+        $g.FillRectangle($bg, $Rect)
         $g.DrawRectangle($pen, $Rect)
-
         if (-not [string]::IsNullOrEmpty($Text)) {
-            # Measure text
-            $size = $g.MeasureString($Text, $font, [int]($out.Width / 2))
-            $pad  = 8
-            $boxW = [int]($size.Width  + ($pad * 2))
-            $boxH = [int]($size.Height + ($pad * 2))
-
-            # Position: above-right of the rect. Clamp to image bounds.
-            $bx = [int]($Rect.Right + 24)
-            $by = [int]($Rect.Top   - $boxH - 24)
-            if ($by -lt 4) { $by = [int]($Rect.Bottom + 24) }              # fall below if no room
-            if (($bx + $boxW) -gt ($out.Width - 4)) { $bx = $out.Width - $boxW - 4 }
-            if ($bx -lt 4) { $bx = 4 }
-            if (($by + $boxH) -gt ($out.Height - 4)) { $by = $out.Height - $boxH - 4 }
-            if ($by -lt 4) { $by = 4 }
-
-            $box = New-Object System.Drawing.Rectangle $bx, $by, $boxW, $boxH
-
-            # Leader line from rect corner to box corner
-            $start = New-Object System.Drawing.Point ([int]($Rect.Right - 4)), ([int]($Rect.Top + 4))
-            $end   = New-Object System.Drawing.Point $bx, ([int]($by + $boxH / 2))
-            $g.DrawLine($line, $start, $end)
-
-            # Callout box
-            $g.FillRectangle($bgBrush, $box)
-            $g.DrawRectangle($pen, $box)
-
-            # Text inside
+            $pad = 6
             $textRect = New-Object System.Drawing.RectangleF (
-                [float]($bx + $pad),
-                [float]($by + $pad),
-                [float]($boxW - $pad * 2),
-                [float]($boxH - $pad * 2)
+                [float]($Rect.X + $pad),
+                [float]($Rect.Y + $pad),
+                [float]($Rect.Width  - $pad * 2),
+                [float]($Rect.Height - $pad * 2)
             )
-            $g.DrawString($Text, $font, $fgBrush, $textRect)
+            $g.DrawString($Text, $font, $fg, $textRect, $format)
         }
     } finally {
-        $pen.Dispose(); $line.Dispose(); $bgBrush.Dispose(); $fgBrush.Dispose(); $font.Dispose()
-        $g.Dispose()
+        $bg.Dispose(); $fg.Dispose(); $pen.Dispose(); $font.Dispose(); $format.Dispose(); $g.Dispose()
     }
     return $out
 }
@@ -1906,15 +1900,16 @@ function Show-MaskEditor {
     $reader = [System.Xml.XmlNodeReader]::new($xml)
     $win = [Windows.Markup.XamlReader]::Load($reader)
 
-    $imgCanvas     = $win.FindName('ImgCanvas')
-    $overlay       = $win.FindName('OverlayCanvas')
-    $dragRect      = $win.FindName('DragRect')
-    $btnAddRect    = $win.FindName('BtnAddRect')
-    $btnAddCallout = $win.FindName('BtnAddCallout')
-    $btnUndo       = $win.FindName('BtnUndo')
-    $btnSave       = $win.FindName('BtnSave')
-    $btnCancel     = $win.FindName('BtnCancel')
-    $imageHost     = $win.FindName('ImageHost')
+    $imgCanvas  = $win.FindName('ImgCanvas')
+    $overlay    = $win.FindName('OverlayCanvas')
+    $dragRect   = $win.FindName('DragRect')
+    $btnBlackout = $win.FindName('BtnBlackout')
+    $btnFrame    = $win.FindName('BtnFrame')
+    $btnComment  = $win.FindName('BtnComment')
+    $btnUndo     = $win.FindName('BtnUndo')
+    $btnSave     = $win.FindName('BtnSave')
+    $btnCancel   = $win.FindName('BtnCancel')
+    $imageHost   = $win.FindName('ImageHost')
 
     $current = Read-BitmapNoLock -Path $ImagePath
     $history = New-Object System.Collections.Generic.Stack[System.Drawing.Bitmap]
@@ -1959,31 +1954,35 @@ function Show-MaskEditor {
 
     $overlay.Add_MouseLeftButtonUp({ $state.Down = $false }.GetNewClosure())
 
-    $btnAddRect.Add_Click({
-        if ($dragRect.Width -lt 2 -or $dragRect.Height -lt 2) { return }
-        $rect = New-Object System.Drawing.Rectangle `
+    # Common helper: pull rect from drag overlay, return $null if too small
+    $getRect = {
+        if ($dragRect.Width -lt 4 -or $dragRect.Height -lt 4) { return $null }
+        New-Object System.Drawing.Rectangle `
             ([int][System.Windows.Controls.Canvas]::GetLeft($dragRect)), `
             ([int][System.Windows.Controls.Canvas]::GetTop($dragRect)), `
             ([int]$dragRect.Width), ([int]$dragRect.Height)
+    }.GetNewClosure()
+
+    $applyOp = {
+        param($factory)
+        $rect = & $getRect
+        if (-not $rect) { return }
         $history.Push($current) | Out-Null
-        $current = Add-BlackoutRect -SourceBitmap $current -Rect $rect
+        $current = & $factory $rect
         & $refreshImage
         $dragRect.Visibility = 'Collapsed'
-    }.GetNewClosure())
+    }.GetNewClosure()
 
-    $btnAddCallout.Add_Click({
-        if ($dragRect.Width -lt 4 -or $dragRect.Height -lt 4) { return }
+    $btnBlackout.Add_Click({ & $applyOp { param($r) Add-BlackoutRect -SourceBitmap $current -Rect $r } }.GetNewClosure())
+    $btnFrame.Add_Click(   { & $applyOp { param($r) Add-FrameRect    -SourceBitmap $current -Rect $r } }.GetNewClosure())
+    $btnComment.Add_Click( {
+        $rect = & $getRect
+        if (-not $rect) { return }
         Add-Type -AssemblyName Microsoft.VisualBasic
-        $text = [Microsoft.VisualBasic.Interaction]::InputBox(
-            'Enter callout text / 吹き出しの本文を入力してください。',
-            '枠+吹き出し', '')
+        $text = [Microsoft.VisualBasic.Interaction]::InputBox('コメントの本文を入力してください。', 'コメント挿入', '')
         if ($null -eq $text) { return }
-        $rect = New-Object System.Drawing.Rectangle `
-            ([int][System.Windows.Controls.Canvas]::GetLeft($dragRect)), `
-            ([int][System.Windows.Controls.Canvas]::GetTop($dragRect)), `
-            ([int]$dragRect.Width), ([int]$dragRect.Height)
         $history.Push($current) | Out-Null
-        $current = Add-FrameWithCallout -SourceBitmap $current -Rect $rect -Text $text
+        $current = Add-CommentRect -SourceBitmap $current -Rect $rect -Text $text
         & $refreshImage
         $dragRect.Visibility = 'Collapsed'
     }.GetNewClosure())

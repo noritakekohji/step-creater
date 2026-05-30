@@ -135,7 +135,7 @@ Describe 'MaskEditor.xaml' {
         $reader = [System.Xml.XmlNodeReader]::new($xml)
         $win = [Windows.Markup.XamlReader]::Load($reader)
         foreach ($n in @('ImgCanvas','OverlayCanvas','DragRect',
-                         'BtnAddRect','BtnAddCallout','BtnUndo','BtnSave','BtnCancel',
+                         'BtnBlackout','BtnFrame','BtnComment','BtnUndo','BtnSave','BtnCancel',
                          'ImageHost','ImageScroller')) {
             $win.FindName($n) | Should -Not -BeNullOrEmpty -Because "$n should exist in MaskEditor.xaml"
         }
