@@ -1923,14 +1923,25 @@ function Show-MaskEditor {
     $state = [pscustomobject]@{ Down = $false; X0 = 0; Y0 = 0; Saved = $false }
 
     $refreshImage = {
+        # Force 96 DPI on the working bitmap so its pixel coordinates match WPF
+        # logical units 1:1. Without this, screenshots captured on a high-DPI
+        # screen (e.g. 144 DPI) cause the Image to render at a scaled logical
+        # size while the OverlayCanvas keeps logical size = pixel count — drag
+        # rectangle coordinates then disagree with bitmap pixel coordinates and
+        # the annotation lands at the wrong place.
+        $st.Current.SetResolution(96, 96)
+
         $ms = New-Object System.IO.MemoryStream
         $st.Current.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+        $ms.Position = 0
         $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
         $bmp.BeginInit()
         $bmp.StreamSource = $ms
         $bmp.CacheOption = 'OnLoad'
         $bmp.EndInit()
         $imgCanvas.Source = $bmp
+        # Stretch="Fill" on the Image makes these explicit Width/Height drive
+        # the rendered size, keeping logical units == bitmap pixels.
         $imgCanvas.Width  = $st.Current.Width
         $imgCanvas.Height = $st.Current.Height
         $imageHost.Width  = $st.Current.Width

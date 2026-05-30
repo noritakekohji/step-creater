@@ -17,7 +17,7 @@
         </StackPanel>
         <ScrollViewer x:Name="ImageScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <Grid x:Name="ImageHost" HorizontalAlignment="Left" VerticalAlignment="Top">
-                <Image  x:Name="ImgCanvas" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                <Image  x:Name="ImgCanvas" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                 <Canvas x:Name="OverlayCanvas" Background="Transparent" HorizontalAlignment="Left" VerticalAlignment="Top">
                     <Rectangle x:Name="DragRect" Stroke="Red" StrokeThickness="2"
                                Fill="#33FF0000" Visibility="Collapsed"/>
