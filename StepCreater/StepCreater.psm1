@@ -2242,8 +2242,8 @@ function Get-DashboardRows {
         $no = 0
         foreach ($step in $doc.Steps) {
             $no++
-            $started  = if ($step.Started)  { $step.Started.ToString('yyyy-MM-dd HH:mm:ss') }  else { '' }
-            $finished = if ($step.Finished) { $step.Finished.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            $started  = if ($step.Started)  { $step.Started.ToString('yyyy-MM-dd') }  else { '' }
+            $finished = if ($step.Finished) { $step.Finished.ToString('yyyy-MM-dd') } else { '' }
             $rows.Add([pscustomobject]@{
                 Workfolder     = $wfName
                 WorkfolderPath = $wfPath
@@ -2252,6 +2252,8 @@ function Get-DashboardRows {
                 StepId         = $step.Id
                 StepTitle      = $step.Title
                 Status         = $step.Status
+                Executor       = (Get-EffectiveRole -Step $step -Procedure $doc -Role Executor)
+                Verifier       = (Get-EffectiveRole -Step $step -Procedure $doc -Role Verifier)
                 Started        = $started
                 Finished       = $finished
                 Duration       = (Get-StepDuration -Step $step)
@@ -2260,6 +2262,126 @@ function Get-DashboardRows {
         }
     }
     return $rows.ToArray()
+}
+
+function Get-DashboardSummary {
+    <#
+    .SYNOPSIS
+      Aggregates dashboard rows into per-procedure status counts plus the grand-total
+      distribution suitable for a pie chart.
+    #>
+    [CmdletBinding()]
+    [OutputType([pscustomobject])]
+    param([Parameter(Mandatory)] [AllowEmptyCollection()] [object[]]$Rows)
+
+    $statuses = @('creating','reviewing','created','executing','verifying','ng','aborted','done')
+
+    # Per-procedure counts: group by WorkfolderPath
+    $perProcedure = New-Object System.Collections.Generic.List[object]
+    $groups = @($Rows) | Group-Object -Property WorkfolderPath
+    foreach ($g in $groups) {
+        $first = $g.Group[0]
+        $rec = [ordered]@{
+            Workfolder     = $first.Workfolder
+            ProcedureTitle = $first.ProcedureTitle
+            Total          = $g.Group.Count
+        }
+        foreach ($s in $statuses) {
+            $rec[$s] = (@($g.Group | Where-Object { $_.Status -eq $s })).Count
+        }
+        $perProcedure.Add([pscustomobject]$rec) | Out-Null
+    }
+
+    # Grand-total status counts
+    $total = [ordered]@{}
+    foreach ($s in $statuses) {
+        $total[$s] = (@($Rows | Where-Object { $_.Status -eq $s })).Count
+    }
+
+    return [pscustomobject]@{
+        PerProcedure = $perProcedure.ToArray()
+        Total        = [pscustomobject]$total
+        Statuses     = $statuses
+    }
+}
+
+function Update-DashboardPieChart {
+    <#
+    .SYNOPSIS
+      Renders a pie chart of status counts onto a Canvas using WPF Path/ArcSegment.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Canvas,
+        [Parameter(Mandatory)] $Counts   # pscustomobject with status keys → ints
+    )
+    Add-Type -AssemblyName PresentationFramework
+
+    $Canvas.Children.Clear()
+
+    $colorMap = @{
+        creating  = '#9E9E9E'
+        reviewing = '#FFC107'
+        created   = '#2196F3'
+        executing = '#03A9F4'
+        verifying = '#FF9800'
+        ng        = '#F44336'
+        aborted   = '#795548'
+        done      = '#4CAF50'
+    }
+
+    $total = 0
+    foreach ($k in $colorMap.Keys) { $total += [int]$Counts.$k }
+    if ($total -le 0) {
+        $tb = New-Object System.Windows.Controls.TextBlock
+        $tb.Text = 'データなし'
+        $tb.Foreground = [System.Windows.Media.Brushes]::DimGray
+        [System.Windows.Controls.Canvas]::SetLeft($tb, 80)
+        [System.Windows.Controls.Canvas]::SetTop($tb, 90)
+        $Canvas.Children.Add($tb) | Out-Null
+        return
+    }
+
+    $cx = 100.0; $cy = 100.0; $r = 80.0
+    $start = -90.0   # start at 12 o'clock
+    foreach ($k in 'creating','reviewing','created','executing','verifying','ng','aborted','done') {
+        $n = [int]$Counts.$k
+        if ($n -le 0) { continue }
+        $sweep = 360.0 * $n / $total
+        $end = $start + $sweep
+
+        $rad1 = $start * [math]::PI / 180.0
+        $rad2 = $end   * [math]::PI / 180.0
+        $p1 = New-Object System.Windows.Point ($cx + $r * [math]::Cos($rad1)), ($cy + $r * [math]::Sin($rad1))
+        $p2 = New-Object System.Windows.Point ($cx + $r * [math]::Cos($rad2)), ($cy + $r * [math]::Sin($rad2))
+        $isLarge = $sweep -gt 180.0
+
+        $fig = New-Object System.Windows.Media.PathFigure
+        $fig.StartPoint = New-Object System.Windows.Point $cx, $cy
+        $seg1 = New-Object System.Windows.Media.LineSegment ($p1, $true)
+        $arc  = New-Object System.Windows.Media.ArcSegment
+        $arc.Point = $p2
+        $arc.Size = New-Object System.Windows.Size $r, $r
+        $arc.IsLargeArc = $isLarge
+        $arc.SweepDirection = 'Clockwise'
+        $fig.Segments.Add($seg1) | Out-Null
+        $fig.Segments.Add($arc)  | Out-Null
+        $fig.IsClosed = $true
+
+        $geom = New-Object System.Windows.Media.PathGeometry
+        $geom.Figures.Add($fig) | Out-Null
+
+        $path = New-Object System.Windows.Shapes.Path
+        $path.Data = $geom
+        $brush = [System.Windows.Media.BrushConverter]::new().ConvertFromString($colorMap[$k])
+        $path.Fill = $brush
+        $path.Stroke = [System.Windows.Media.Brushes]::White
+        $path.StrokeThickness = 1
+        $path.ToolTip = ('{0}: {1} ({2:N1}%)' -f $k, $n, (100.0 * $n / $total))
+
+        $Canvas.Children.Add($path) | Out-Null
+        $start = $end
+    }
 }
 
 function Export-DashboardCsv {
@@ -2300,6 +2422,8 @@ function Show-DashboardWindow {
     $btnExport   = $win.FindName('BtnExportCsv')
     $grid        = $win.FindName('DashGrid')
     $status      = $win.FindName('DashStatus')
+    $pieCanvas   = $win.FindName('PieCanvas')
+    $summaryGrid = $win.FindName('SummaryGrid')
 
     $state = [pscustomobject]@{ Parent = $InitialParent; Rows = @() }
 
@@ -2313,6 +2437,9 @@ function Show-DashboardWindow {
             $rows = Get-DashboardRows -ParentFolder $state.Parent
             $state.Rows = $rows
             $grid.ItemsSource = $rows
+            $summary = Get-DashboardSummary -Rows $rows
+            $summaryGrid.ItemsSource = $summary.PerProcedure
+            Update-DashboardPieChart -Canvas $pieCanvas -Counts $summary.Total
             $procCount = (@($rows | Select-Object -ExpandProperty WorkfolderPath -Unique)).Count
             $status.Text = "$procCount 件の手順書 / $($rows.Count) 行 を表示中。"
         } catch {

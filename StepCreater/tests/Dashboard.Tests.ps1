@@ -32,8 +32,8 @@ Describe 'Get-DashboardRows' {
         $rowsA[0].StepId                   | Should -Be '01'
         $rowsA[0].StepTitle                | Should -Be 'Setup'
         $rowsA[0].Status                   | Should -Be 'done'
-        $rowsA[0].Started                  | Should -Be '2026-05-27 10:00:00'
-        $rowsA[0].Finished                 | Should -Be '2026-05-27 10:05:00'
+        $rowsA[0].Started                  | Should -Be '2026-05-27'
+        $rowsA[0].Finished                 | Should -Be '2026-05-27'
         $rowsA[0].Duration                 | Should -Be '00:05:00'
 
         $rowB = @($rows | Where-Object { $_.Workfolder -eq 'B' })[0]
@@ -74,8 +74,8 @@ Describe 'Export-DashboardCsv' {
         $rows = @(
             [pscustomobject]@{
                 Workfolder='A'; WorkfolderPath='C:\A'; ProcedureTitle='手順書'; StepNo=1; StepId='01';
-                StepTitle='テスト'; Status='done'; Started='2026-05-27 10:00:00';
-                Finished='2026-05-27 10:05:00'; Duration='00:05:00'; Updated='2026-05-27 10:05:00'
+                StepTitle='テスト'; Status='done'; Executor='ExecUser'; Verifier='VerUser';
+                Started='2026-05-27'; Finished='2026-05-27'; Duration='00:05:00'; Updated='2026-05-27 10:05:00'
             }
         )
         $tmp = Join-Path $TestDrive ("d-" + ([guid]::NewGuid().ToString('N').Substring(0,8)) + ".csv")
@@ -93,5 +93,89 @@ Describe 'Export-DashboardCsv' {
         $text | Should -Match 'ProcedureTitle'
         $text | Should -Match '手順書'
         $text | Should -Match 'テスト'
+    }
+}
+
+Describe 'Get-DashboardSummary' {
+    It 'counts statuses per procedure and total' {
+        $rows = @(
+            [pscustomobject]@{Workfolder='A'; WorkfolderPath='C:\A'; ProcedureTitle='Proc A'; Status='done'; Executor='X'; Verifier='Y'; StepNo=1; StepId='01'; StepTitle='a'; Started=''; Finished=''; Duration=''; Updated=''}
+            [pscustomobject]@{Workfolder='A'; WorkfolderPath='C:\A'; ProcedureTitle='Proc A'; Status='creating'; Executor='X'; Verifier='Y'; StepNo=2; StepId='02'; StepTitle='b'; Started=''; Finished=''; Duration=''; Updated=''}
+            [pscustomobject]@{Workfolder='B'; WorkfolderPath='C:\B'; ProcedureTitle='Proc B'; Status='ng'; Executor='Z'; Verifier='Y'; StepNo=1; StepId='01'; StepTitle='c'; Started=''; Finished=''; Duration=''; Updated=''}
+        )
+        $sum = Get-DashboardSummary -Rows $rows
+        $sum.PerProcedure.Count          | Should -Be 2
+        $procA = $sum.PerProcedure | Where-Object { $_.ProcedureTitle -eq 'Proc A' }
+        $procA.Total      | Should -Be 2
+        $procA.done       | Should -Be 1
+        $procA.creating   | Should -Be 1
+        $sum.Total.done | Should -Be 1
+        $sum.Total.ng   | Should -Be 1
+    }
+
+    It 'returns empty PerProcedure on empty rows' {
+        $sum = Get-DashboardSummary -Rows @()
+        $sum.PerProcedure.Count | Should -Be 0
+    }
+}
+
+Describe 'Update-DashboardPieChart' {
+    BeforeAll { Add-Type -AssemblyName PresentationFramework }
+
+    It 'renders one Path per non-zero status' {
+        $canvas = New-Object System.Windows.Controls.Canvas
+        $counts = [pscustomobject]@{
+            creating=2; reviewing=0; created=0; executing=1; verifying=0; ng=1; aborted=0; done=0
+        }
+        Update-DashboardPieChart -Canvas $canvas -Counts $counts
+        # 3 paths for the 3 non-zero statuses
+        $paths = @($canvas.Children | Where-Object { $_.GetType().Name -eq 'Path' })
+        $paths.Count | Should -Be 3
+    }
+
+    It 'shows a "no data" text when all counts are zero' {
+        $canvas = New-Object System.Windows.Controls.Canvas
+        $counts = [pscustomobject]@{
+            creating=0; reviewing=0; created=0; executing=0; verifying=0; ng=0; aborted=0; done=0
+        }
+        Update-DashboardPieChart -Canvas $canvas -Counts $counts
+        $texts = @($canvas.Children | Where-Object { $_.GetType().Name -eq 'TextBlock' })
+        $texts.Count | Should -Be 1
+    }
+}
+
+Describe 'Get-DashboardRows new columns' {
+    It 'emits Executor and Verifier from effective role' {
+        $tmp = Join-Path $TestDrive ("dash2-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-Item -ItemType Directory -Path $tmp | Out-Null
+        $wf = Join-Path $tmp 'W'
+        New-StepCreaterWorkfolder -Path $wf -Title 'Proc' | Out-Null
+        $sess = Open-StepCreaterWorkfolder -Path $wf
+        $sess.Procedure.DefaultExecutor = 'DefExec'
+        $sess.Procedure.DefaultVerifier = 'DefVer'
+        $s = $sess.Procedure.AddStep('A'); $s.Verifier = 'StepVer'   # step override
+        Save-WorkSession -Session $sess
+
+        $rows = @(Get-DashboardRows -ParentFolder $tmp)
+        $rows.Count | Should -Be 1
+        $rows[0].Executor | Should -Be 'DefExec'    # fallback from default
+        $rows[0].Verifier | Should -Be 'StepVer'    # step override
+    }
+
+    It 'emits dates only (yyyy-MM-dd) for Started and Finished' {
+        $tmp = Join-Path $TestDrive ("dash3-" + ([guid]::NewGuid().ToString('N').Substring(0,8)))
+        New-Item -ItemType Directory -Path $tmp | Out-Null
+        $wf = Join-Path $tmp 'W'
+        New-StepCreaterWorkfolder -Path $wf -Title 'Proc' | Out-Null
+        $sess = Open-StepCreaterWorkfolder -Path $wf
+        $s = $sess.Procedure.AddStep('A')
+        $s.Started  = [datetime]'2026-05-27T10:00:00'
+        $s.Finished = [datetime]'2026-05-27T11:30:00'
+        $s.Status = 'done'
+        Save-WorkSession -Session $sess
+
+        $rows = @(Get-DashboardRows -ParentFolder $tmp)
+        $rows[0].Started  | Should -Be '2026-05-27'
+        $rows[0].Finished | Should -Be '2026-05-27'
     }
 }

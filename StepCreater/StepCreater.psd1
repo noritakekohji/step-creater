@@ -48,6 +48,8 @@
         'Show-ProcedureInfoDialog',
         'Show-SettingsDialog',
         'Get-DashboardRows',
+        'Get-DashboardSummary',
+        'Update-DashboardPieChart',
         'Export-DashboardCsv',
         'Show-DashboardWindow'
     )
