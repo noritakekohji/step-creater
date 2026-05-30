@@ -15,6 +15,7 @@
             </MenuItem>
             <MenuItem x:Name="MenuTemplates" Header="テンプレ挿入(_T)"/>
             <MenuItem x:Name="MenuSettings" Header="設定(_S)..."/>
+            <MenuItem x:Name="MenuDashboard" Header="ダッシュボード(_D)..."/>
         </Menu>
 
         <StatusBar DockPanel.Dock="Bottom">

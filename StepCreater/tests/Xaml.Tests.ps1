@@ -24,7 +24,7 @@
         $window = [Windows.Markup.XamlReader]::Load($reader)
 
         foreach ($name in @(
-            'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates','MenuSettings',
+            'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates','MenuSettings','MenuDashboard',
             'StatusText','DirtyText',
             'TabEdit','TabExecute','TabCapture',
             'WorkfolderPath','BtnSave',
@@ -42,6 +42,36 @@
         }
     }
 }
+Describe 'DashboardWindow.xaml' {
+    BeforeAll {
+        Add-Type -AssemblyName PresentationFramework
+        Add-Type -AssemblyName PresentationCore
+        Add-Type -AssemblyName WindowsBase
+        $script:dwPath = Join-Path $PSScriptRoot '..\ui\DashboardWindow.xaml'
+    }
+
+    It 'file exists' {
+        Test-Path $script:dwPath | Should -BeTrue
+    }
+
+    It 'parses without error and produces a Window' {
+        $xml = [xml](Get-Content -LiteralPath $script:dwPath -Raw)
+        $reader = [System.Xml.XmlNodeReader]::new($xml)
+        $win = [Windows.Markup.XamlReader]::Load($reader)
+        $win | Should -Not -BeNullOrEmpty
+        $win.GetType().Name | Should -Be 'Window'
+    }
+
+    It 'has all expected named controls' {
+        $xml = [xml](Get-Content -LiteralPath $script:dwPath -Raw)
+        $reader = [System.Xml.XmlNodeReader]::new($xml)
+        $win = [Windows.Markup.XamlReader]::Load($reader)
+        foreach ($name in @('TxtParentPath','BtnPickParent','BtnRescan','BtnExportCsv','DashGrid','DashStatus')) {
+            $win.FindName($name) | Should -Not -BeNullOrEmpty -Because "$name should exist in DashboardWindow.xaml"
+        }
+    }
+}
+
 Describe 'SettingsDialog.xaml' {
     BeforeAll {
         Add-Type -AssemblyName PresentationFramework

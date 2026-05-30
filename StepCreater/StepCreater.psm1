@@ -462,7 +462,7 @@ function Show-StepCreaterMainWindow {
 
     $c = @{}
     foreach ($name in @(
-        'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates','MenuSettings',
+        'MenuNew','MenuOpen','MenuSave','MenuExportHtml','MenuExit','MenuTemplates','MenuSettings','MenuDashboard',
         'StatusText','DirtyText',
         'TabEdit','TabExecute','TabCapture',
         'WorkfolderPath','BtnSave',
@@ -960,6 +960,12 @@ function Show-StepCreaterMainWindow {
             $window.Tag.HotkeyHandle = $hk
         }
         $c.StatusText.Text = "設定を更新しました ($(Get-Date -Format HH:mm:ss))"
+    }.GetNewClosure())
+
+    $c.MenuDashboard.Add_Click({
+        # Pass the current workfolder's parent as default
+        $parent = Split-Path -Parent $Session.WorkFolderPath
+        Show-DashboardWindow -Owner $window -InitialParent $parent
     }.GetNewClosure())
 
     $window.Add_Loaded({
@@ -1981,4 +1987,164 @@ function Show-SettingsDialog {
 
     [void]$win.ShowDialog()
     return $saved.Ok
+}
+
+function Get-DashboardRows {
+    <#
+    .SYNOPSIS
+      Scans a parent folder recursively for StepCreater workfolders (any directory
+      containing procedure.md) and returns flat Step-level rows for dashboard display.
+    #>
+    [CmdletBinding()]
+    [OutputType([object[]])]
+    param([Parameter(Mandatory)] [string]$ParentFolder)
+
+    if (-not (Test-Path -LiteralPath $ParentFolder)) {
+        throw "Parent folder not found: $ParentFolder"
+    }
+
+    $rows = New-Object System.Collections.Generic.List[object]
+    $mdFiles = Get-ChildItem -LiteralPath $ParentFolder -Filter 'procedure.md' -Recurse -File -ErrorAction SilentlyContinue
+
+    foreach ($mdFile in $mdFiles) {
+        $wfPath = $mdFile.DirectoryName
+        $wfName = Split-Path -Leaf $wfPath
+        $updated = $mdFile.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')
+        try {
+            $doc = Read-Procedure -Path $mdFile.FullName
+        } catch {
+            # Surface a single failed row so the user knows
+            $rows.Add([pscustomobject]@{
+                Workfolder     = $wfName
+                WorkfolderPath = $wfPath
+                ProcedureTitle = "(読み込み失敗: $($_.Exception.Message))"
+                StepNo         = 0
+                StepId         = ''
+                StepTitle      = ''
+                Status         = 'error'
+                Started        = ''
+                Finished       = ''
+                Duration       = ''
+                Updated        = $updated
+            }) | Out-Null
+            continue
+        }
+
+        $no = 0
+        foreach ($step in $doc.Steps) {
+            $no++
+            $started  = if ($step.Started)  { $step.Started.ToString('yyyy-MM-dd HH:mm:ss') }  else { '' }
+            $finished = if ($step.Finished) { $step.Finished.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+            $rows.Add([pscustomobject]@{
+                Workfolder     = $wfName
+                WorkfolderPath = $wfPath
+                ProcedureTitle = $doc.Title
+                StepNo         = $no
+                StepId         = $step.Id
+                StepTitle      = $step.Title
+                Status         = $step.Status
+                Started        = $started
+                Finished       = $finished
+                Duration       = (Get-StepDuration -Step $step)
+                Updated        = $updated
+            }) | Out-Null
+        }
+    }
+    return $rows.ToArray()
+}
+
+function Export-DashboardCsv {
+    <#
+    .SYNOPSIS
+      Exports dashboard rows to CSV with UTF-8 BOM (so Excel opens Japanese cleanly
+      with a double-click).
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [object[]]$Rows,
+        [Parameter(Mandatory)] [string]$Path
+    )
+    # Use ConvertTo-Csv (in-memory) then write with explicit UTF-8 BOM
+    $csv = $Rows | ConvertTo-Csv -NoTypeInformation
+    $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+    [System.IO.File]::WriteAllLines($Path, $csv, $utf8Bom)
+}
+
+function Show-DashboardWindow {
+    [CmdletBinding()]
+    param(
+        [Parameter()] $Owner,
+        [Parameter()] [string]$InitialParent
+    )
+    Add-Type -AssemblyName PresentationFramework
+    Add-Type -AssemblyName System.Windows.Forms
+
+    $xamlPath = Join-Path $PSScriptRoot 'ui/DashboardWindow.xaml'
+    $xml = [xml](Get-Content -LiteralPath $xamlPath -Raw)
+    $reader = [System.Xml.XmlNodeReader]::new($xml)
+    $win = [Windows.Markup.XamlReader]::Load($reader)
+    if ($Owner) { $win.Owner = $Owner }
+
+    $txtPath     = $win.FindName('TxtParentPath')
+    $btnPick     = $win.FindName('BtnPickParent')
+    $btnRescan   = $win.FindName('BtnRescan')
+    $btnExport   = $win.FindName('BtnExportCsv')
+    $grid        = $win.FindName('DashGrid')
+    $status      = $win.FindName('DashStatus')
+
+    $state = [pscustomobject]@{ Parent = $InitialParent; Rows = @() }
+
+    $doScan = {
+        if (-not $state.Parent -or -not (Test-Path -LiteralPath $state.Parent)) {
+            $status.Text = '親フォルダを選択してください。'
+            $grid.ItemsSource = $null
+            return
+        }
+        try {
+            $rows = Get-DashboardRows -ParentFolder $state.Parent
+            $state.Rows = $rows
+            $grid.ItemsSource = $rows
+            $procCount = (@($rows | Select-Object -ExpandProperty WorkfolderPath -Unique)).Count
+            $status.Text = "$procCount 件の手順書 / $($rows.Count) 行 を表示中。"
+        } catch {
+            $status.Text = "スキャン失敗: $($_.Exception.Message)"
+        }
+    }.GetNewClosure()
+
+    if ($InitialParent) { $txtPath.Text = $InitialParent; & $doScan }
+
+    $btnPick.Add_Click({
+        $dlg = [System.Windows.Forms.FolderBrowserDialog]::new()
+        $dlg.Description = 'ダッシュボード対象の親フォルダを選択'
+        if ($state.Parent) { $dlg.SelectedPath = $state.Parent }
+        if ($dlg.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        $state.Parent = $dlg.SelectedPath
+        $txtPath.Text = $dlg.SelectedPath
+        & $doScan
+    }.GetNewClosure())
+
+    $btnRescan.Add_Click({ & $doScan }.GetNewClosure())
+
+    $btnExport.Add_Click({
+        if (-not $state.Rows -or $state.Rows.Count -eq 0) {
+            [System.Windows.MessageBox]::Show('出力する行がありません。','情報','OK','Information') | Out-Null
+            return
+        }
+        $sfd = [System.Windows.Forms.SaveFileDialog]::new()
+        $sfd.Filter = 'CSV (*.csv)|*.csv'
+        $sfd.FileName = ('dashboard_' + (Get-Date -Format 'yyyy-MM-dd_HHmmss') + '.csv')
+        if ($sfd.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        try {
+            Export-DashboardCsv -Rows $state.Rows -Path $sfd.FileName
+            $status.Text = "CSV出力: $($sfd.FileName)"
+        } catch {
+            [System.Windows.MessageBox]::Show("CSV出力に失敗: $($_.Exception.Message)",'エラー','OK','Error') | Out-Null
+        }
+    }.GetNewClosure())
+
+    $win.Add_KeyDown({
+        if ($_.Key -eq [System.Windows.Input.Key]::Escape) { $win.Close() }
+    }.GetNewClosure())
+
+    [void]$win.ShowDialog()
 }

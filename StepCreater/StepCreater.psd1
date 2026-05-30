@@ -44,7 +44,10 @@
         'Show-MaskEditor',
         'Get-StepDuration',
         'ConvertTo-ProcedureHtml',
-        'Show-SettingsDialog'
+        'Show-SettingsDialog',
+        'Get-DashboardRows',
+        'Export-DashboardCsv',
+        'Show-DashboardWindow'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
