@@ -2421,12 +2421,10 @@ function Show-SettingsDialog {
     $txtFull   = $win.FindName('TxtHkFull')
     $txtWindow = $win.FindName('TxtHkWindow')
     $txtRect   = $win.FindName('TxtHkRect')
-    $chkAnnot  = $win.FindName('ChkAnnotation')
 
     $txtFull.Text   = $cfg.hotkeys.fullScreen
     $txtWindow.Text = $cfg.hotkeys.window
     $txtRect.Text   = $cfg.hotkeys.rect
-    $chkAnnot.IsChecked = [bool]$cfg.annotationEnabled
 
     $saved = [pscustomobject]@{ Ok = $false }
 
@@ -2443,7 +2441,7 @@ function Show-SettingsDialog {
         $cfg.hotkeys.fullScreen = $txtFull.Text
         $cfg.hotkeys.window     = $txtWindow.Text
         $cfg.hotkeys.rect       = $txtRect.Text
-        $cfg.annotationEnabled  = [bool]$chkAnnot.IsChecked
+        # annotationEnabled is preserved as-is (default true); no longer surfaced in UI
         Set-StepCreaterConfig -Config $cfg
         $saved.Ok = $true
         $win.Close()

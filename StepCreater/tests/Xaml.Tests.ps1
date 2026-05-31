@@ -87,7 +87,7 @@ Describe 'SettingsDialog.xaml' {
         $reader = [System.Xml.XmlNodeReader]::new($xml)
         $win = [Windows.Markup.XamlReader]::Load($reader)
         $win.GetType().Name | Should -Be 'Window'
-        foreach ($n in @('TxtHkFull','TxtHkWindow','TxtHkRect','ChkAnnotation','BtnOk','BtnCancel')) {
+        foreach ($n in @('TxtHkFull','TxtHkWindow','TxtHkRect','BtnOk','BtnCancel')) {
             $win.FindName($n) | Should -Not -BeNullOrEmpty
         }
     }

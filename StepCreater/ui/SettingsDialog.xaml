@@ -28,9 +28,6 @@
                 <TextBox   Grid.Row="2" Grid.Column="1" x:Name="TxtHkRect"   Margin="0,2"/>
             </Grid>
 
-            <TextBlock FontWeight="Bold" Text="アノテーション" Margin="0,8,0,6"/>
-            <CheckBox x:Name="ChkAnnotation" Content="マウス位置に赤丸とキャプションバーを追加する"/>
-
             <TextBlock FontStyle="Italic" Foreground="DimGray" TextWrapping="Wrap" Margin="0,16,0,0"
                        Text="例: Ctrl+F12, Ctrl+Shift+F11, Alt+S。OKで保存し、ホットキーは即時再登録されます。"/>
         </StackPanel>
